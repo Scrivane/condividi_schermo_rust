@@ -8,4 +8,11 @@
 |capture/yuv_convert          | non chiaro , forse cambia cosa viene visualizzato su windows(colori)         |non credo     |windows   |
 |capture/mod.rs         |gestisce cattura schemo ( os dipendente)    |si    |tokio , async_trait(provides an attribute macro to make async fn in traits work with dyn traits |
 |capture/capturer.rs         |gestisce room , cattura display e selezione display , (atributo profiler permette streem in un file e quindi penso registrazione)  |si    |tokio , clap( parser di argomenti di linea di comando) |
-|Dashes          |`-- is en-dash, --- is em-dash`|-- is en-dash, --- is em-dash|'Isn't this fun?'            |
+|encoder          | codifica il video |si |ac_ffmpeg |
+|gui         |gestisce  la gui  |si    | iced( crossplatform gui library), tokio,directories(gestione file per ogni os) |
+|input      |gestisce il controllo remoto dell'altro  pc |parzialmente( solo nella parte di inserire testo forse)    |tokio,serde (serializza e deserializza strutture dati), enigo (simula input mouse e tastiera) |
+|output    |gestisce  i vari tipi di output possibili ( file , stream , nessuno per testing) | si |async_trait, tokio,webrtc (gestisce protoclli web , nel nostro caso utile per far connesione e streaming),rtcp(gestisce feedback su quality of service )|
+|signaller    |gestisce  le connessioni | si |async_trait, tokio,webrtc,strum(semplifica utilizzo di enum e strings ),serde |
+|performance_profiler.rs |gestisce  i report sulle prestazini| no |chrono( gestisce date), howlong( cronometro per tempo di esecuzione)|
+|config.rs|gestisce  configurazione iniziale probabilemnte dell'accesso al sito relativo all'app web| no |twilio (penso sia il servizio di hosting del sito web ),serde,base64,webrtc|
+
