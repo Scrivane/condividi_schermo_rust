@@ -1,0 +1,6 @@
+| subfolder    | cosa fa | è utile | crate usati |
+| -------- | ------- | ------- |
+| Auth  | gestisce   autenticazione   e multipli viewers|  non serve autenticazione perche non è necessario autenticarci per accedere nella nostra applicazione( basta accedere all'indirizzo) , gestire multipli viewrs è utile | tokio per gestire acessi concorrenti , per autenticazione non ho scritto perche non serve|
+| February | $80     |  $250    | - |
+| March    | $420    |  $250    | - |
+
