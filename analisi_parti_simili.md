@@ -5,5 +5,7 @@
 |capture/display          | fornisce tratto display selector per selezionare che display usare         | si     | - |
 |capture/macos          | gestisce cattura audio e video  su mac e screen record(stream)     | si |apple_sys( FFI( foreign fuction inteface)  bindings to C (and some C++) libraries) per macos (non valido sul lungo periodo vedi  crate core-foundation-rs per lungo supporto, ac_ffmpeg       |
 |capture/wgc          |gestisce suporto per device windows            |si           |windows (permette di chiamare api di windows )         |
-|capture/yuv_convert          |`"Isn't this fun?"`            |"Isn't this fun?"            |'Isn't this fun?'            |
+|capture/yuv_convert          | non chiaro , forse cambia cosa viene visualizzato su windows(colori)         |non credo     |windows   |
+|capture/mod.rs         |gestisce cattura schemo ( os dipendente)    |si    |tokio , async_trait(provides an attribute macro to make async fn in traits work with dyn traits |
+|capture/capturer.rs         |gestisce room , cattura display e selezione display , (atributo profiler permette streem in un file e quindi penso registrazione)  |si    |tokio , clap( parser di argomenti di linea di comando) |
 |Dashes          |`-- is en-dash, --- is em-dash`|-- is en-dash, --- is em-dash|'Isn't this fun?'            |
