@@ -7,18 +7,18 @@ use std::thread;
 use std::time::Duration;
 
 fn main() {
+
     let screen = read_input("Specifica il numero dello schermo da registrare (es. 0): ");
-    let output = read_input("Specifica il percorso del file di output (es. output.mp4): ");
+    //let output = read_input("Specifica il percorso del file di output (es. output.mp4): ");
 
     let screen: u32 = screen.trim().parse().unwrap_or_else(|e| {
         eprintln!("Errore nel parsing del numero dello schermo: {}", e);
         process::exit(1);
     });
-
-    let output = output.trim();
+    
 
     let mut recorder = recorder::ScreenRecorder::new();
-    recorder.start(screen);
+    recorder.start(screen).expect("TODO: panic message");
 
     println!("Registrazione avviata. Premere Ctrl+C per fermare.");
 
