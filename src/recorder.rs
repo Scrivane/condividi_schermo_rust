@@ -36,37 +36,31 @@ impl ScreenRecorder {
 
         // Rileva il sistema operativo
         let os = env::consts::OS;
-        /*
+
 
         // Crea l'elemento della sorgente video
-        let video_src = match os {
+        let videosrc = match os {
             "windows" => {
                 gst::ElementFactory::make("d3d11screencapturesrc")
                     .property("display-id", &0)
                     .build()
-                    .map_err(|_| "Failed to create dshowvideosrc".to_string())?
+                    .map_err(|_| ServerError{ message: "Failed to create d3d11screencapturesrc".to_string()})?
             }
             "macos" => {
                 gst::ElementFactory::make("avfvideosrc")
                     .build()
-                    .map_err(|_| "Failed to create avfvideosrc".to_string())?
+                    .map_err(|_| ServerError{ message: "Failed to create avfvideosrc".to_string()})?
             }
             "linux" => {
                 gst::ElementFactory::make("ximagesrc")
                     .build()
-                    .map_err(|_| "Failed to create ximagesrc".to_string())?
+                    .map_err(|_| ServerError{ message: "Failed to create ximagesrc".to_string()})?
             }
             _ => {
-                return Err("OS non supportato".to_string());
+                return Err(ServerError{ message: "OS non supportato".to_string()});
             }
         };
 
-
-         */
-
-        let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
-            .build()
-            .map_err(|_| ServerError { message: "Failed to create d3d11screencapturesrc".to_string() })?;
 
         let capsfilter = gst::ElementFactory::make("capsfilter")
             .property(
