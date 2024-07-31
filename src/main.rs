@@ -15,10 +15,10 @@ fn main() {
         eprintln!("Errore nel parsing del numero dello schermo: {}", e);
         process::exit(1);
     });
-    
+
 
     let mut recorder = recorder::ScreenRecorder::new();
-    recorder.start(screen).expect("TODO: panic message");
+    recorder.start(screen).expect("Errore nell'avvio della registrazione");
 
     println!("Registrazione avviata. Premere Ctrl+C per fermare.");
 

@@ -25,9 +25,13 @@ impl ScreenRecorder {
 
         let pipeline = Pipeline::new();
 
+
+
+
         // Rileva il sistema operativo
         let os = env::consts::OS;
 
+        /*
         // Ottieni il percorso del desktop
         let desktop_path = match os {
             "windows" => {
@@ -49,8 +53,10 @@ impl ScreenRecorder {
         };
 
         // Nome del file
-        let filename = desktop_path.join("recording.webm");
+        let filename = desktop_path.join("recording.mp4");
         println!("Filename {}",filename.to_str().unwrap());
+
+        */
 
         // Crea l'elemento della sorgente video
         let video_src = match os {
@@ -75,66 +81,45 @@ impl ScreenRecorder {
             }
         };
 
+        let filename = PathBuf::from("output.mp4");
 
-
-        let videoconvert = gst::ElementFactory::make("videoconvert")
+        let video_convert = gst::ElementFactory::make("videoconvert")
             .build()
             .map_err(|_| "Failed to create videoconvert".to_string())?;
-        let vp8enc = gst::ElementFactory::make("vp8enc")
+        let video_encoder   = gst::ElementFactory::make("openh264enc")
             .build()
-            .map_err(|_| "Failed to create vp8enc".to_string())?;
-        let webmmux = gst::ElementFactory::make("webmmux")
+            .map_err(|_| "Failed to create avenc_mpeg4".to_string())?;
+        let h264_parse  = gst::ElementFactory::make("h264parse")
             .build()
-            .map_err(|_| "Failed to create webmmux".to_string())?;
+            .map_err(|_| "Failed to create h264parse".to_string())?;
+        let mp4mux = gst::ElementFactory::make("mp4mux")
+            .build()
+            .map_err(|_| "Failed to create mp4mux".to_string())?;
         let filesink = gst::ElementFactory::make("filesink")
             .property("location", filename.to_str().unwrap())
             .build()
             .map_err(|_| "Failed to create filesink".to_string())?;
 
         // Aggiungi gli elementi alla pipeline
-        pipeline.add_many(&[&video_src, &videoconvert, &vp8enc, &webmmux, &filesink])
+        pipeline.add_many(&[&video_src, &video_convert, &video_encoder, &h264_parse, &mp4mux, &filesink])
             .map_err(|_| "Failed to add elements to pipeline".to_string())?;
 
         // Collega gli elementi
-        video_src.link(&videoconvert)
+        video_src.link(&video_convert)
             .map_err(|_| "Failed to link video_src to videoconvert".to_string())?;
-        videoconvert.link(&vp8enc)
-            .map_err(|_| "Failed to link videoconvert to vp8enc".to_string())?;
-        vp8enc.link(&webmmux)
-            .map_err(|_| "Failed to link vp8enc to webmmux".to_string())?;
+        video_convert.link(&video_encoder)
+            .map_err(|_| "Failed to link videoconvert to video_encoder".to_string())?;
+        video_encoder.link(&h264_parse)
+            .map_err(|_| "Failed to link h264_parse to video_encoder".to_string())?;
+        h264_parse.link(&mp4mux)
+            .map_err(|_| "Failed to link h264_parse to mp4mux".to_string())?;
+        mp4mux.link(&filesink)
+            .map_err(|_| "Failed to link mp4mux to filesink".to_string())?;
 
-        // Aggiungi un elemento audio dummy per il muxer (opzionale)
-        let audiotestsrc = gst::ElementFactory::make("audiotestsrc")
-            .build()
-            .map_err(|_| "Failed to create audiotestsrc".to_string())?;
-        let audioconvert = gst::ElementFactory::make("audioconvert")
-            .build()
-            .map_err(|_| "Failed to create audioconvert".to_string())?;
-        let audioresample = gst::ElementFactory::make("audioresample")
-            .build()
-            .map_err(|_| "Failed to create audioresample".to_string())?;
-        let vorbisaenc = gst::ElementFactory::make("vorbisaenc")
-            .build()
-            .map_err(|_| "Failed to create vorbisaenc".to_string())?;
-
-        pipeline.add_many(&[&audiotestsrc, &audioconvert, &audioresample, &vorbisaenc])
-            .map_err(|_| "Failed to add audio elements to pipeline".to_string())?;
-
-        audiotestsrc.link(&audioconvert)
-            .map_err(|_| "Failed to link audiotestsrc to audioconvert".to_string())?;
-        audioconvert.link(&audioresample)
-            .map_err(|_| "Failed to link audioconvert to audioresample".to_string())?;
-        audioresample.link(&vorbisaenc)
-            .map_err(|_| "Failed to link audioresample to vorbisaenc".to_string())?;
-        vorbisaenc.link(&webmmux)
-            .map_err(|_| "Failed to link vorbisaenc to webmmux".to_string())?;
-
-        webmmux.link(&filesink)
-            .map_err(|_| "Failed to link webmmux to filesink".to_string())?;
 
         // Imposta la pipeline in stato di riproduzione
-        pipeline.set_state(State::Playing)
-            .map_err(|_| "Failed to set pipeline to Playing state".to_string())?;
+        pipeline.set_state(State::Playing);
+
 
         self.pipeline = Some(pipeline);
         self.recording = true;
