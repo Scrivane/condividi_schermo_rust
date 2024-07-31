@@ -1,68 +1,48 @@
 use gst::prelude::*;
 use gst::{Pipeline, State};
 use std::env;
-use std::path::PathBuf;
+use std::fmt;
+
 pub struct ScreenRecorder {
     pipeline: Option<Pipeline>,
     recording: bool,
 }
 
+//migliorare gestione errori
+pub struct ServerError {
+    message: String,
+}
+
+impl fmt::Debug for ServerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ServerError: {}", self.message)
+    }
+}
+
+impl fmt::Display for ServerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ServerError: {}", self.message)
+    }
+}
+
+impl std::error::Error for ServerError {}
 impl ScreenRecorder {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, ServerError> {
         gst::init().unwrap();
-        ScreenRecorder {
-            pipeline: None,
-            recording: false,
-        }
-    }
 
-    pub fn get_screens() -> Vec<String> {
-        // Legge gli schermi disponibili
-        vec!["Screen 0".to_string(), "Screen 1".to_string()]
-    }
-
-    pub fn start(&mut self, screen_index: u32) -> Result<(), String> {
 
         let pipeline = Pipeline::new();
 
 
-
-
         // Rileva il sistema operativo
         let os = env::consts::OS;
-
         /*
-        // Ottieni il percorso del desktop
-        let desktop_path = match os {
-            "windows" => {
-                let mut path = PathBuf::from(env::var("USERPROFILE").unwrap());
-                path.push("Desktop");
-                path
-            }
-            "macos" => {
-                let mut path = PathBuf::from(env::var("HOME").unwrap());
-                path.push("Desktop");
-                path
-            }
-            "linux" => {
-                let mut path = PathBuf::from(env::var("HOME").unwrap());
-                path.push("Desktop");
-                path
-            }
-            _ => return Err("OS non supportato".to_string()),
-        };
-
-        // Nome del file
-        let filename = desktop_path.join("recording.mp4");
-        println!("Filename {}",filename.to_str().unwrap());
-
-        */
 
         // Crea l'elemento della sorgente video
         let video_src = match os {
             "windows" => {
-                gst::ElementFactory::make("dshowvideosrc")
-                    .property("device", &format!("screen://{}", screen_index))
+                gst::ElementFactory::make("d3d11screencapturesrc")
+                    .property("display-id", &0)
                     .build()
                     .map_err(|_| "Failed to create dshowvideosrc".to_string())?
             }
@@ -81,62 +61,101 @@ impl ScreenRecorder {
             }
         };
 
-        let filename = PathBuf::from("output.mp4");
+
+         */
+
+        let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
+            .build()
+            .map_err(|_| ServerError { message: "Failed to create d3d11screencapturesrc".to_string() })?;
+
+        let capsfilter = gst::ElementFactory::make("capsfilter")
+            .property(
+                "caps",
+                gst::Caps::builder("video/x-raw")
+                    .field("framerate", &gst::Fraction::new(30, 1))
+                    .build(),
+            )
+            .build()
+            .map_err(|_| ServerError { message: "Failed to create capsfilter".to_string() })?;
+
 
         let video_convert = gst::ElementFactory::make("videoconvert")
             .build()
-            .map_err(|_| "Failed to create videoconvert".to_string())?;
-        let video_encoder   = gst::ElementFactory::make("openh264enc")
+            .map_err(|_| ServerError { message: "Failed to create videoconvert".to_string() })?;
+
+        let video_encoder   = gst::ElementFactory::make("x264enc")
+            .property_from_str("tune", "zerolatency")
             .build()
-            .map_err(|_| "Failed to create avenc_mpeg4".to_string())?;
-        let h264_parse  = gst::ElementFactory::make("h264parse")
+            .map_err(|_| ServerError { message: "Failed to create x264enc".to_string() })?;
+
+        let flvmux = gst::ElementFactory::make("flvmux")
             .build()
-            .map_err(|_| "Failed to create h264parse".to_string())?;
-        let mp4mux = gst::ElementFactory::make("mp4mux")
-            .build()
-            .map_err(|_| "Failed to create mp4mux".to_string())?;
+            .map_err(|_| ServerError { message: "Failed to create flvmux".to_string() })?;
+
+
         let filesink = gst::ElementFactory::make("filesink")
-            .property("location", filename.to_str().unwrap())
+            .property("location", &"video.flv")
             .build()
-            .map_err(|_| "Failed to create filesink".to_string())?;
+            .map_err(|_| ServerError { message: "Failed to create filesink".to_string() })?;
+
 
         // Aggiungi gli elementi alla pipeline
-        pipeline.add_many(&[&video_src, &video_convert, &video_encoder, &h264_parse, &mp4mux, &filesink])
-            .map_err(|_| "Failed to add elements to pipeline".to_string())?;
+        pipeline.add_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
+            .map_err(|_| ServerError {message: "Failed to add elements to pipeline".to_string()})?;
+
 
         // Collega gli elementi
-        video_src.link(&video_convert)
-            .map_err(|_| "Failed to link video_src to videoconvert".to_string())?;
-        video_convert.link(&video_encoder)
-            .map_err(|_| "Failed to link videoconvert to video_encoder".to_string())?;
-        video_encoder.link(&h264_parse)
-            .map_err(|_| "Failed to link h264_parse to video_encoder".to_string())?;
-        h264_parse.link(&mp4mux)
-            .map_err(|_| "Failed to link h264_parse to mp4mux".to_string())?;
-        mp4mux.link(&filesink)
-            .map_err(|_| "Failed to link mp4mux to filesink".to_string())?;
+        gst::Element::link_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
+            .map_err(|_| ServerError {message: "Failed to link elements".to_string()})?;
+
+        // Gestione degli eventi
+        let bus = pipeline.bus().unwrap();
+        let pipeline_clone = pipeline.clone();
+        std::thread::spawn(move || {
+            for msg in bus.iter_timed(gst::ClockTime::NONE) {
+                match msg.view() {
+                    gst::MessageView::Eos(..) => {
+                        println!("End of stream");
+                        pipeline_clone.set_state(State::Null).unwrap();
+                        break;
+                    }
+                    gst::MessageView::Error(err) => {
+                        println!(
+                            "Error received from element {:?}: {:?}",
+                            err.src().map(|s| s.path_string()),
+                            err.error()
+                        );
+                        println!("Debugging information: {:?}", err.debug());
+                        pipeline_clone.set_state(State::Null).unwrap();
+                        break;
+                    }
+                    _ => (),
+                }
+            }
+        });
+
+        Ok(Self {
+            pipeline: Some(pipeline),
+            recording: false,
+        })
+    }
 
 
+
+    pub fn start(&mut self) -> Result<(), String> {
         // Imposta la pipeline in stato di riproduzione
-        pipeline.set_state(State::Playing);
-
-
-        self.pipeline = Some(pipeline);
+        let pipeline = self.pipeline.as_ref().unwrap();
+        pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline to Playing".to_string())?;
         self.recording = true;
-
-
 
         Ok(())
     }
     pub fn stop(&mut self) {
         if let Some(ref pipeline) = self.pipeline {
-            pipeline.set_state(State::Null).unwrap();
+            pipeline.set_state(State::Null).map(|_| ());
         }
         self.pipeline = None;
         self.recording = false;
     }
 
-    pub fn is_recording(&self) -> bool {
-        self.recording
-    }
 }
