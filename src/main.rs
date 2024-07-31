@@ -1,44 +1,36 @@
-mod recorder;
+mod streamer;
+mod client;
 //mod gui;
 
-use std::io::{self, Write};
-use std::process;
-use std::thread;
-use std::time::Duration;
+use streamer::ScreenStreamer;
+use client::VideoPlayer;
+use std::env;
+use std::error::Error;
 
-fn main() {
-
-    let screen = read_input("Specifica il numero dello schermo da registrare (es. 0): ");
-    //let output = read_input("Specifica il percorso del file di output (es. output.mp4): ");
-
-    let screen: u32 = screen.trim().parse().unwrap_or_else(|e| {
-        eprintln!("Errore nel parsing del numero dello schermo: {}", e);
-        process::exit(1);
-    });
-
-
-    let mut recorder = recorder::ScreenRecorder::new();
-    recorder.start(screen).expect("Errore nell'avvio della registrazione");
-
-    println!("Registrazione avviata. Premere Ctrl+C per fermare.");
-
-    ctrlc::set_handler(move || {
-        recorder.stop();
-        println!("Registrazione fermata.");
-        process::exit(0);
-    })
-        .expect("Errore nell'impostazione dell'handler Ctrl+C");
-
-    // Mantiene il processo in esecuzione finché non viene premuto Ctrl+C
-    loop {
-        thread::sleep(Duration::from_secs(1));
+fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        return Err("Usage: <program> [server|client]".into());
     }
+
+    let mode = &args[1];
+    match mode.as_str() {
+        "server" => {
+            let mut streamer = ScreenStreamer::new()?;
+            streamer.start()?;
+            println!("Server started. Press Enter to stop...");
+            let _ = std::io::stdin().read_line(&mut String::new());
+            streamer.stop();
+        }
+        "client" => {
+            let mut player = VideoPlayer::new()?;
+            println!("Client started. Press Enter to stop...");
+            let _ = std::io::stdin().read_line(&mut String::new());
+            player.stop();
+        }
+        _ => return Err("Invalid mode. Use 'server' or 'client'".into()),
+    }
+
+    Ok(())
 }
 
-fn read_input(prompt: &str) -> String {
-    let mut input = String::new();
-    print!("{}", prompt);
-    io::stdout().flush().expect("Errore nel flush dell'output");
-    io::stdin().read_line(&mut input).expect("Errore nella lettura dell'input");
-    input
-}
