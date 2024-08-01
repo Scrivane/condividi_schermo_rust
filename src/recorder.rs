@@ -52,15 +52,29 @@ impl ScreenRecorder {
                     .map_err(|_| ServerError{ message: "Failed to create avfvideosrc".to_string()})?
             }
             "linux" => {
-                gst::ElementFactory::make("ximagesrc")
-                    .build()
+             /*     println!("su linusx");   // installo xdg-desktop-portal-gnome , ci sono per gl altri sistemi operativi 
+                gst::ElementFactory::make("pipewiresrc")
+                .property_from_str("target-object", "screen")
+                .build()
+                .map_err(|_| ServerError{ message: "Failed to create pipewiresrc".to_string()})?
+
+                */
+            //    src.set_property("fd", &capturable.fd.as_raw_fd());
+     //   src.set_property("path", &format!("{}", capturable.path));
+
+
+                gst::ElementFactory::make("ximagesrc")   //non funziona con wayland ma solo xdg open 
+                .property("use-damage", false)
+                .build()
                     .map_err(|_| ServerError{ message: "Failed to create ximagesrc".to_string()})?
+
+
+                    
             }
             _ => {
                 return Err(ServerError{ message: "OS non supportato".to_string()});
             }
         };
-
 
         let capsfilter = gst::ElementFactory::make("capsfilter")
             .property(
@@ -93,14 +107,28 @@ impl ScreenRecorder {
             .map_err(|_| ServerError { message: "Failed to create filesink".to_string() })?;
 
 
-        // Aggiungi gli elementi alla pipeline
-        pipeline.add_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
+        
+    pipeline.add_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
+            .map_err(|_| ServerError {message: "Failed to add elements to pipeline".to_string()})?;
+ 
+
+        //test con wayland
+        /* 
+        pipeline.add_many(&[&videosrc, &video_convert, &video_encoder, &flvmux, &filesink])
             .map_err(|_| ServerError {message: "Failed to add elements to pipeline".to_string()})?;
 
+
+            gst::Element::link_many(&[&videosrc, &video_convert, &video_encoder, &flvmux, &filesink])
+            .map_err(|_| ServerError {message: "Failed to link elements".to_string()})?;
+
+*/
 
         // Collega gli elementi
         gst::Element::link_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
             .map_err(|_| ServerError {message: "Failed to link elements".to_string()})?;
+
+
+
 
         // Gestione degli eventi
         let bus = pipeline.bus().unwrap();

@@ -42,13 +42,13 @@ fn main() -> Result<(), Box<dyn Error>> {
      recorder.start();
      println!("Registrazione avviata. Premere Ctrl+C per fermare.");
 
-    ctrlc::set_handler(move || {
+     ctrlc::set_handler(move || {
         recorder.stop();
         println!("Registrazione fermata.");
         recorder.stop();
         process::exit(0);
-    }).expect("Errore interruzione programma");
-
+    }).expect("Errore interruzione programma");   
+ 
     // Mantiene il processo in esecuzione finché non viene premuto Ctrl+C
     loop {
         thread::sleep(Duration::from_secs(1));
