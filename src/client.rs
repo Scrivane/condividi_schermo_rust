@@ -1,6 +1,7 @@
 use gst::prelude::*;
 use gst::{Pipeline, State};
 use std::fmt;
+use crate::streamer::ServerError;
 
 pub struct VideoPlayer {
     pipeline: Option<Pipeline>,
@@ -25,42 +26,84 @@ impl fmt::Display for ClientError {
 impl std::error::Error for ClientError {}
 impl VideoPlayer {
     pub fn new() -> Result<Self, ClientError> {
-        gst::init().map_err(|_| ClientError { message: "Failed to initialize GStreamer".to_string() })?;
+        // Inizializza GStreamer
+        gst::init()?;
 
+        // Crea una nuova pipeline
         let pipeline = Pipeline::new();
 
-        let uridecodebin = gst::ElementFactory::make("uridecodebin")
-            .property("uri", &"udp://127.0.0.1:5000")
-            .build()
-            .map_err(|_| ClientError { message: "Failed to create uridecodebin".to_string() })?;
+        // Crea gli elementi GStreamer
+        let udpsrc = gst::ElementFactory::make("udpsrc")?;
+        let queue1 = gst::ElementFactory::make("queue")?;
+        let rtph264depay = gst::ElementFactory::make("rtph264depay")?;
+        let queue2 = gst::ElementFactory::make("queue")?;
+        let ffdec_h264 = gst::ElementFactory::make("ffdec_h264")?;
+        let queue3 = gst::ElementFactory::make("queue")?;
+        let autovideosink = gst::ElementFactory::make("autovideosink")?;
 
-        let video_convert = gst::ElementFactory::make("videoconvert")
-            .build()
-            .map_err(|_| ClientError { message: "Failed to create videoconvert".to_string() })?;
+        // Imposta le proprietà di udpsrc
+        udpsrc.set_property("port", &9002)?;
+        udpsrc.set_property("caps", &gst::Caps::new_simple("application/x-rtp", &[]))?;
 
-        let video_sink = gst::ElementFactory::make("autovideosink")
-            .build()
-            .map_err(|_| ClientError { message: "Failed to create autovideosink".to_string() })?;
+        // Aggiungi gli elementi alla pipeline
+        pipeline.add_many(&[
+            &udpsrc,
+            &queue1,
+            &rtph264depay,
+            &queue2,
+            &ffdec_h264,
+            &queue3,
+            &autovideosink,
+        ])?;
 
-        pipeline.add_many(&[&uridecodebin, &video_convert, &video_sink])
-            .map_err(|_| ClientError { message: "Failed to add elements to pipeline".to_string() })?;
+        // Collega gli elementi nella pipeline usando link_many
+        gst::Element::link_many(&[
+            &udpsrc,
+            &queue1,
+            &rtph264depay,
+            &queue2,
+            &ffdec_h264,
+            &queue3,
+            &autovideosink,
+        ])?;
 
-        // Collega uridecodebin e video_convert
-        uridecodebin.connect_pad_added({
-            let video_convert = video_convert.clone(); // Clone video_convert to avoid moving
-            move |_, src_pad| {
-                let sink_pad = video_convert.static_pad("sink").unwrap();
-                src_pad.link(&sink_pad).expect("Failed to link pads");
+        // Avvia la pipeline
+        pipeline.set_state(State::Playing)?;
+
+        // Attendi fino a quando non viene ricevuto un messaggio di errore o fine del flusso
+        let bus = pipeline.bus().unwrap();
+        for msg in bus.iter_timed(gst::ClockTime::NONE) {
+            match msg.view() {
+                gst::MessageView::Eos(..) => {
+                    println!("End of stream");
+                    break;
+                }
+                gst::MessageView::Error(err) => {
+                    eprintln!(
+                        "Error received from element {:?}: {}",
+                        err.src().map(|s| s.path_string()),
+                        err.error()
+                    );
+                    eprintln!("Debugging information: {:?}", err.debug());
+                    break;
+                }
+                _ => (),
             }
-        });
+        }
 
-        video_convert.link(&video_sink).map_err(|_| ClientError { message: "Failed to link video_convert to video_sink".to_string() })?;
+        // Arresta la pipeline
+        pipeline.set_state(State::Null)?;
 
-        pipeline.set_state(State::Playing).map_err(|_| ClientError { message: "Failed to set pipeline to Playing".to_string() })?;
-
-        Ok(Self {
+        Ok(Self{
             pipeline: Some(pipeline),
         })
+    }
+
+    pub fn start(&mut self) -> Result<(), ClientError> {
+        if let Some(ref pipeline) = self.pipeline {
+            pipeline.set_state(State::Playing).map_err(|_| ClientError { message: "Failed to start playing".to_string()})?;
+        }
+        Ok(())
     }
 
     pub fn stop(&mut self) {

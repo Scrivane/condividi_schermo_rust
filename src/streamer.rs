@@ -31,79 +31,10 @@ impl ScreenStreamer {
         gst::init().unwrap();
 
 
-        let pipeline = Pipeline::new();
+        #[cfg(target_os = "windows")]
+        let pipeline = Self::create_pipeline_windows()?;
 
 
-        // Rileva il sistema operativo
-        let os = env::consts::OS;
-
-        /*
-
-        // Crea l'elemento della sorgente video
-        let video_src = match os {
-            "windows" => {
-                gst::ElementFactory::make("d3d11screencapturesrc")
-                    .property("display-id", &0)
-                    .build()
-                    .map_err(|_| "Failed to create dshowvideosrc".to_string())?
-            }
-            "macos" => {
-                gst::ElementFactory::make("avfvideosrc")
-                    .build()
-                    .map_err(|_| "Failed to create avfvideosrc".to_string())?
-            }
-            "linux" => {
-                gst::ElementFactory::make("ximagesrc")
-                    .build()
-                    .map_err(|_| "Failed to create ximagesrc".to_string())?
-            }
-            _ => {
-                return Err("OS non supportato".to_string());
-            }
-        };
-
-
-         */
-
-        let videosrc = gst::ElementFactory::make("ximagesrc")
-            .property("use-damage", false)
-            .build()
-            .map_err(|_| ServerError { message: "Failed to create ximagesrc".to_string() })?;
-
-        let capsfilter = gst::ElementFactory::make("capsfilter")
-            .property(
-                "caps",
-                gst::Caps::builder("video/x-raw")
-                    .field("framerate", &gst::Fraction::new(30, 1))
-                    .build(),
-            )
-            .build()
-            .map_err(|_| ServerError { message: "Failed to create capsfilter".to_string() })?;
-
-
-        let video_convert = gst::ElementFactory::make("videoconvert")
-            .build()
-            .map_err(|_| ServerError { message: "Failed to create videoconvert".to_string() })?;
-        let video_encoder   = gst::ElementFactory::make("x264enc")
-            .property_from_str("tune", "zerolatency")
-            .build()
-            .map_err(|_| ServerError { message: "Failed to create x264enc".to_string() })?;
-
-        let multiudpsink = gst::ElementFactory::make("multiudpsink")
-            .build()
-            .map_err(|_| ServerError { message: "Failed to create multiudpsink".to_string() })?;
-
-
-        // Aggiungi gli elementi alla pipeline
-        pipeline.add_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &multiudpsink])
-            .map_err(|_| ServerError {message: "Failed to add elements to pipeline".to_string()})?;
-
-
-        // Collega gli elementi
-        gst::Element::link_many(&[&videosrc, &video_convert, &video_encoder, &multiudpsink])
-            .map_err(|_| ServerError {message: "Failed to link elements".to_string()})?;
-
-        // Gestione degli eventi
         let bus = pipeline.bus().unwrap();
         let pipeline_clone = pipeline.clone();
         std::thread::spawn(move || {
@@ -133,6 +64,82 @@ impl ScreenStreamer {
             pipeline: Some(pipeline),
             streaming: false,
         })
+
+
+    }
+
+    #[cfg(target_os = "windows")]
+    fn create_pipeline_windows() -> Result<Pipeline, crate::streamer::ServerError> {
+        let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
+            .property("monitor-index", &0)
+            .build()
+            .map_err(|_| ServerError { message: "Failed to create d3d11screencapturesrc".to_string()})?;
+
+        Self::create_common_pipeline(videosrc)
+    }
+
+    fn create_common_pipeline(videosrc: gst::Element) -> Result<Pipeline, ServerError> {
+        let capsfilter = gst::ElementFactory::make("capsfilter")
+            .property(
+                "caps",
+                gst::Caps::builder("video/x-raw")
+                    .field("framerate", &gst::Fraction::new(30, 1))
+                    .build(),
+            )
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create capsfilter".to_string(),
+            })?;
+
+        let queue1 = gst::ElementFactory::make("queue")?;
+        let videoconvert = gst::ElementFactory::make("videoconvert")?;
+        let queue2 = gst::ElementFactory::make("queue")?;
+        let x264enc = gst::ElementFactory::make("x264enc")?;
+        let queue3 = gst::ElementFactory::make("queue")?;
+        let rtph264pay = gst::ElementFactory::make("rtph264pay")?;
+        let queue4 = gst::ElementFactory::make("queue")?;
+        let udpsink = gst::ElementFactory::make("udpsink")?;
+
+        // Imposta le proprietà di udpsink
+        udpsink.set_property("host", &"127.0.0.1")?;
+        udpsink.set_property("port", &9002)?;
+
+        let pipeline = Pipeline::new();
+
+        // Aggiungi gli elementi alla pipeline
+        pipeline.add_many(&[
+            &videosrc,
+            &capsfilter,
+            &queue1,
+            &videoconvert,
+            &queue2,
+            &x264enc,
+            &queue3,
+            &rtph264pay,
+            &queue4,
+            &udpsink,
+        ])?;
+
+        // Collega gli elementi nella pipeline usando link_many
+        gst::Element::link_many(&[
+            &videosrc,
+            &capsfilter,
+            &queue1,
+            &videoconvert,
+            &queue2,
+            &x264enc,
+            &queue3,
+            &rtph264pay,
+            &queue4,
+            &udpsink,
+        ])?;
+
+        // Avvia la pipeline
+        pipeline.set_state(State::Playing)?;
+
+
+        Ok(pipeline)
+
     }
 
 
@@ -153,11 +160,4 @@ impl ScreenStreamer {
         self.streaming = false;
     }
 
-    /*
-    pub fn is_recording(&self) -> bool {
-        self.recording
-    }
-
-
-     */
 }
