@@ -1,6 +1,5 @@
 use gst::prelude::*;
 use gst::{Pipeline, State};
-use std::env;
 use std::fmt;
 
 pub struct ScreenStreamer {
@@ -69,7 +68,7 @@ impl ScreenStreamer {
     }
 
     #[cfg(target_os = "windows")]
-    fn create_pipeline_windows() -> Result<Pipeline, crate::streamer::ServerError> {
+    fn create_pipeline_windows() -> Result<Pipeline, ServerError> {
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
             .property("monitor-index", &0)
             .build()
@@ -91,22 +90,61 @@ impl ScreenStreamer {
                 message: "Failed to create capsfilter".to_string(),
             })?;
 
-        let queue1 = gst::ElementFactory::make("queue")?;
-        let videoconvert = gst::ElementFactory::make("videoconvert")?;
-        let queue2 = gst::ElementFactory::make("queue")?;
-        let x264enc = gst::ElementFactory::make("x264enc")?;
-        let queue3 = gst::ElementFactory::make("queue")?;
-        let rtph264pay = gst::ElementFactory::make("rtph264pay")?;
-        let queue4 = gst::ElementFactory::make("queue")?;
-        let udpsink = gst::ElementFactory::make("udpsink")?;
+        let queue1 = gst::ElementFactory::make("queue")
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create queue1".to_string(),
+            })?;
 
-        // Imposta le proprietà di udpsink
-        udpsink.set_property("host", &"127.0.0.1")?;
-        udpsink.set_property("port", &9002)?;
+        let videoconvert = gst::ElementFactory::make("videoconvert")
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create videoconvert".to_string(),
+            })?;
+
+        let queue2 = gst::ElementFactory::make("queue")
+            .build()
+            .map_err(
+                |_| ServerError {
+                    message: "Failed to create queue2".to_string(),
+                },
+            )?;
+
+
+        let x264enc = gst::ElementFactory::make("x264enc")
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create x264enc".to_string(),
+            })?;
+
+        let queue3 = gst::ElementFactory::make("queue")
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create queue3".to_string(),
+            })?;
+        let rtph264pay = gst::ElementFactory::make("rtph264pay")
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create rtph264pay".to_string(),
+            })?;
+        let queue4 = gst::ElementFactory::make("queue")
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create queue4".to_string(),
+            })?;
+        //set properties to udp sink for connection
+        let udpsink = gst::ElementFactory::make("udpsink")
+            .property("host", &"127.0.0.1")
+            .property("port", &5000)
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create udpsink".to_string(),
+            })?;
+
 
         let pipeline = Pipeline::new();
 
-        // Aggiungi gli elementi alla pipeline
+        //add elements to the pipeline
         pipeline.add_many(&[
             &videosrc,
             &capsfilter,
@@ -118,9 +156,11 @@ impl ScreenStreamer {
             &rtph264pay,
             &queue4,
             &udpsink,
-        ])?;
+        ]).map_err(|_| ServerError {
+            message: "Failed to add elements to pipeline".to_string(),
+        })?;
 
-        // Collega gli elementi nella pipeline usando link_many
+
         gst::Element::link_many(&[
             &videosrc,
             &capsfilter,
@@ -132,10 +172,10 @@ impl ScreenStreamer {
             &rtph264pay,
             &queue4,
             &udpsink,
-        ])?;
+        ]).map_err(|_| ServerError {
+            message: "Failed to link elements".to_string(),
+        })?;
 
-        // Avvia la pipeline
-        pipeline.set_state(State::Playing)?;
 
 
         Ok(pipeline)

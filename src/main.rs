@@ -8,15 +8,13 @@ use streamer::ScreenStreamer;
 use client::VideoPlayer;
 use std::env;
 use std::error::Error;
-use std::process;
-use std::thread;
-use std::time::Duration;
+
 fn main() -> Result<(), Box<dyn Error>> {
 
-    /*
+
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        return Err("Usage: <program> [server|client]".into());
+        return Err("Usage: <program> [streamer|client]".into());
     }
 
     let mode = &args[1];
@@ -30,14 +28,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         "client" => {
             let mut player = VideoPlayer::new()?;
+            player.start()?;
             println!("Client started. Press Enter to stop...");
             let _ = std::io::stdin().read_line(&mut String::new());
             player.stop();
         }
         _ => return Err("Invalid mode. Use 'streamer' or 'client'".into()),
     }
-    */
 
+
+
+    /*
      let mut recorder = recorder::ScreenRecorder::new()?;
      recorder.start();
      println!("Registrazione avviata. Premere Ctrl+C per fermare.");
@@ -53,6 +54,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         thread::sleep(Duration::from_secs(1));
     }
+
+
+     */
 
 
 

@@ -1,7 +1,7 @@
 use gst::prelude::*;
 use gst::{Pipeline, State};
 use std::fmt;
-use crate::streamer::ServerError;
+
 
 pub struct VideoPlayer {
     pipeline: Option<Pipeline>,
@@ -26,24 +26,46 @@ impl fmt::Display for ClientError {
 impl std::error::Error for ClientError {}
 impl VideoPlayer {
     pub fn new() -> Result<Self, ClientError> {
-        // Inizializza GStreamer
-        gst::init()?;
 
-        // Crea una nuova pipeline
+        gst::init().unwrap();
+
+
         let pipeline = Pipeline::new();
 
-        // Crea gli elementi GStreamer
-        let udpsrc = gst::ElementFactory::make("udpsrc")?;
-        let queue1 = gst::ElementFactory::make("queue")?;
-        let rtph264depay = gst::ElementFactory::make("rtph264depay")?;
-        let queue2 = gst::ElementFactory::make("queue")?;
-        let ffdec_h264 = gst::ElementFactory::make("ffdec_h264")?;
-        let queue3 = gst::ElementFactory::make("queue")?;
-        let autovideosink = gst::ElementFactory::make("autovideosink")?;
 
-        // Imposta le proprietà di udpsrc
-        udpsrc.set_property("port", &9002)?;
-        udpsrc.set_property("caps", &gst::Caps::new_simple("application/x-rtp", &[]))?;
+        let udpsrc = gst::ElementFactory::make("udpsrc")
+            .property("port", &5000)
+            .property("caps", &gst::Caps::new_empty_simple("application/x-rtp"))
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string()})?;
+
+        let queue1 = gst::ElementFactory::make("queue")
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'queue1'".to_string()})?;
+
+        let rtph264depay = gst::ElementFactory::make("rtph264depay")
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'rtph264depay'".to_string()})?;
+
+        let queue2 = gst::ElementFactory::make("queue")
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'queue2'".to_string()})?;
+
+        let ffdec_h264 = gst::ElementFactory::make("avdec_h264")
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'avdec_h264'".to_string()})?;
+
+
+        let queue3 = gst::ElementFactory::make("queue")
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'queue3'".to_string()})?;
+
+        let autovideosink = gst::ElementFactory::make("autovideosink")
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'autovideosink'".to_string()})?;
+
+
+
 
         // Aggiungi gli elementi alla pipeline
         pipeline.add_many(&[
@@ -54,7 +76,7 @@ impl VideoPlayer {
             &ffdec_h264,
             &queue3,
             &autovideosink,
-        ])?;
+        ]).map_err(|_| ClientError { message: "Failed to add elements to pipeline".to_string()})?;
 
         // Collega gli elementi nella pipeline usando link_many
         gst::Element::link_many(&[
@@ -65,10 +87,9 @@ impl VideoPlayer {
             &ffdec_h264,
             &queue3,
             &autovideosink,
-        ])?;
+        ]).map_err(|_| ClientError { message: "Failed to link elements".to_string()})?;
 
-        // Avvia la pipeline
-        pipeline.set_state(State::Playing)?;
+
 
         // Attendi fino a quando non viene ricevuto un messaggio di errore o fine del flusso
         let bus = pipeline.bus().unwrap();
@@ -92,7 +113,7 @@ impl VideoPlayer {
         }
 
         // Arresta la pipeline
-        pipeline.set_state(State::Null)?;
+        pipeline.set_state(State::Null).unwrap();
 
         Ok(Self{
             pipeline: Some(pipeline),
