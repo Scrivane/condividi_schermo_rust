@@ -2,6 +2,53 @@ use gst::prelude::*;
 use gst::{Pipeline, State};
 use std::env;
 use std::fmt;
+use std::{thread, time};
+use gst::parse;
+
+//prova
+//mod wayland_screen_cast;
+//
+
+use tokio::runtime::Runtime; 
+use ashpd::{
+    desktop::{
+        screencast::{CursorMode, Screencast, SourceType},
+        PersistMode,
+    },
+    WindowIdentifier,
+};
+
+
+async fn run() -> ashpd::Result<u32> {
+    let proxy = Screencast::new().await?;
+    let mut valnode: u32=0;
+
+
+    
+    let session = proxy.create_session().await?;
+    proxy
+        .select_sources(
+            &session,
+            CursorMode::Metadata,
+            SourceType::Monitor | SourceType::Window,
+            true,
+            None,
+            PersistMode::DoNot,  //donot
+        )
+        .await?;
+
+    let response = proxy
+        .start(&session, &WindowIdentifier::default())
+        .await?
+        .response()?;
+    response.streams().iter().for_each(|stream| {
+        println!("node id: {}", stream.pipe_wire_node_id());
+        println!("size: {:?}", stream.size());
+        println!("position: {:?}", stream.position());
+        valnode=stream.pipe_wire_node_id();
+    });
+    Ok(valnode)
+}
 
 pub struct ScreenRecorder {
     pipeline: Option<Pipeline>,
@@ -38,6 +85,9 @@ impl ScreenRecorder {
         let os = env::consts::OS;
 
 
+        let rt = Runtime::new().map_err(|e| ServerError { message: format!("Failed to create Tokio runtime: {}", e) })?;
+
+
         // Crea l'elemento della sorgente video
         let videosrc = match os {
             "windows" => {
@@ -52,22 +102,83 @@ impl ScreenRecorder {
                     .map_err(|_| ServerError{ message: "Failed to create avfvideosrc".to_string()})?
             }
             "linux" => {
-             /*     println!("su linusx");   // installo xdg-desktop-portal-gnome , ci sono per gl altri sistemi operativi 
-                gst::ElementFactory::make("pipewiresrc")
-                .property_from_str("target-object", "screen")
-                .build()
-                .map_err(|_| ServerError{ message: "Failed to create pipewiresrc".to_string()})?
 
-                */
+
+                let mut valnod = 0;
+
+                let result = rt.block_on(async {
+                    run().await
+                });
+                
+                match result {
+                    Ok(value) => {
+                        valnod = value;  // Assuming `run` returns an integer value or a value that can be assigned to `valnod`
+                    }
+                    Err(e) => {
+                        return Err(ServerError{ message: format!("Failed to run async screencast session: {}", e) });
+                    }
+                };
+
+
+
+
+      
+                
+                    // installo xdg-desktop-portal-gnome , ci sono per gl altri sistemi operativi 
+                 let src=gst::ElementFactory::make("pipewiresrc")
+                .build()
+                .map_err(|_| ServerError{ message: "Failed to create pipewiresrc".to_string()})?;
+                let nodeidPos=valnod as i32; 
+                src.set_property("fd", &nodeidPos);
+
+             
+
+
+                let pipeline_description = format!(r#"
+                        pipewiresrc path={} !
+                        videoscale !
+                        video/x-raw,width=1280,height=720 !
+                        videorate !
+                        video/x-raw,framerate=5/1 !
+                        videoconvert !
+                        video/x-raw,format=BGR !
+                        avimux !
+                        filesink location=./finalmente.avi sync=true
+                    "#, &nodeidPos
+                );
+
+    // Parse the pipeline description
+    let pipeline = gst::parse::launch(pipeline_description.as_str()).expect("Failed to parse pipeline to gst::parse");
+
+    // Start playing the pipeline
+    let pipeline = pipeline.dynamic_cast::<gst::Pipeline>().expect("Failed to cast pipeline to gst::Pipeline");
+
+    pipeline.set_state(gst::State::Playing).expect("Faild to start the pipeline");
+
+
+
+
+
+
+
+
+                println!("su linusx all 'id {}",&nodeidPos); 
+                //src.set_property("node.id", &valnod);
+             
+
+
+                 //   thread::sleep(time::Duration::from_millis(10));
+                src
+                
             //    src.set_property("fd", &capturable.fd.as_raw_fd());
      //   src.set_property("path", &format!("{}", capturable.path));
 
 
-                gst::ElementFactory::make("ximagesrc")   //non funziona con wayland ma solo xdg open 
+            /*     gst::ElementFactory::make("ximagesrc")   //non funziona con wayland ma solo xdg open 
                 .property("use-damage", false)
                 .build()
                     .map_err(|_| ServerError{ message: "Failed to create ximagesrc".to_string()})?
-
+*/
 
                     
             }
@@ -107,13 +218,13 @@ impl ScreenRecorder {
             .map_err(|_| ServerError { message: "Failed to create filesink".to_string() })?;
 
 
-        
+      
     pipeline.add_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
             .map_err(|_| ServerError {message: "Failed to add elements to pipeline".to_string()})?;
- 
+  
 
-        //test con wayland
-        /* 
+        //test con wayland er fuznionare su maggioranza linux
+         /* 
         pipeline.add_many(&[&videosrc, &video_convert, &video_encoder, &flvmux, &filesink])
             .map_err(|_| ServerError {message: "Failed to add elements to pipeline".to_string()})?;
 
@@ -121,10 +232,10 @@ impl ScreenRecorder {
             gst::Element::link_many(&[&videosrc, &video_convert, &video_encoder, &flvmux, &filesink])
             .map_err(|_| ServerError {message: "Failed to link elements".to_string()})?;
 
-*/
+            */
 
         // Collega gli elementi
-        gst::Element::link_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
+         gst::Element::link_many(&[&videosrc, &capsfilter, &video_convert, &video_encoder, &flvmux, &filesink])
             .map_err(|_| ServerError {message: "Failed to link elements".to_string()})?;
 
 
