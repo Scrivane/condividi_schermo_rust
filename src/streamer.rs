@@ -70,6 +70,7 @@ impl ScreenStreamer {
     #[cfg(target_os = "windows")]
     fn create_pipeline_windows() -> Result<Pipeline, ServerError> {
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
+            .property("show-cursor",true)
             .property("monitor-index", &0)
             .build()
             .map_err(|_| ServerError { message: "Failed to create d3d11screencapturesrc".to_string()})?;

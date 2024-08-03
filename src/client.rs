@@ -1,10 +1,12 @@
 use gst::prelude::*;
-use gst::{Pipeline, State};
-use std::fmt;
-
+use gst::{ClockTime, Pipeline, State};
+use std::{fmt, thread};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub struct VideoPlayer {
     pipeline: Option<Pipeline>,
+    is_streaming: Arc<Mutex<bool>>,
 }
 
 pub struct ClientError {
@@ -66,7 +68,6 @@ impl VideoPlayer {
 
 
 
-
         // Aggiungi gli elementi alla pipeline
         pipeline.add_many(&[
             &udpsrc,
@@ -91,41 +92,89 @@ impl VideoPlayer {
 
 
 
-        // Attendi fino a quando non viene ricevuto un messaggio di errore o fine del flusso
-        let bus = pipeline.bus().unwrap();
-        for msg in bus.iter_timed(gst::ClockTime::NONE) {
-            match msg.view() {
-                gst::MessageView::Eos(..) => {
-                    println!("End of stream");
-                    break;
-                }
-                gst::MessageView::Error(err) => {
-                    eprintln!(
-                        "Error received from element {:?}: {}",
-                        err.src().map(|s| s.path_string()),
-                        err.error()
-                    );
-                    eprintln!("Debugging information: {:?}", err.debug());
-                    break;
-                }
-                _ => (),
-            }
-        }
 
-        // Arresta la pipeline
-        pipeline.set_state(State::Null).unwrap();
 
+        // Imposta lo stato della pipeline in "pronta"
+        pipeline.set_state(State::Ready).unwrap();
+
+
+        let is_streming = Arc::new(Mutex::new(false));
         Ok(Self{
             pipeline: Some(pipeline),
+            is_streaming: is_streming,
         })
     }
 
     pub fn start(&mut self) -> Result<(), ClientError> {
         if let Some(ref pipeline) = self.pipeline {
-            pipeline.set_state(State::Playing).map_err(|_| ClientError { message: "Failed to start playing".to_string()})?;
+            pipeline.set_state(State::Playing)
+                .map_err(|_| ClientError { message: "Failed to start playing".to_string() })?;
+
+            let bus = pipeline.bus().unwrap();
+            let is_streaming = Arc::clone(&self.is_streaming);
+            let pipeline_clone = self.pipeline.clone();
+
+            //NOT AN OPTIMAL SOLUTION
+            //the thread check if there are new message in the bus, if there are not, probably the stream is ended
+            //so close the render window
+            thread::spawn(move || {
+                let timeout = Duration::from_secs(5);
+                let mut last_msg_time = std::time::Instant::now();
+
+
+                loop {
+                    match bus.timed_pop(ClockTime::from_seconds(timeout.as_secs())) {
+                        Some(msg) => {
+                            last_msg_time = std::time::Instant::now();
+                            match msg.view() {
+                                gst::MessageView::Eos(..) => {
+                                    println!("End of stream");
+                                    let mut streaming = is_streaming.lock().unwrap();
+                                    *streaming = false;
+                                    break;
+                                }
+                                gst::MessageView::Error(err) => {
+                                    eprintln!(
+                                        "Error received from element {:?}: {}",
+                                        err.src().map(|s| s.path_string()),
+                                        err.error()
+                                    );
+                                    eprintln!("Debugging information: {:?}", err.debug());
+                                    let mut streaming = is_streaming.lock().unwrap();
+                                    *streaming = false;
+                                    break;
+                                }
+                                _ => (),
+                            }
+                        }
+                        None => {
+                            if last_msg_time.elapsed() >= timeout {
+                                println!("No messages received for a while. Stream is ending.");
+                                let mut streaming = is_streaming.lock().unwrap();
+                                *streaming = false;
+                                break;
+                            }
+                        }
+
+
+                    }
+                }
+                if let Some(pipeline) = pipeline_clone {
+                    pipeline.set_state(State::Null).unwrap();
+                }
+                println!("Closing render window.");
+                ClientError { message: "Closing render window".to_string() };
+
+            });
+
+            let mut streaming = self.is_streaming.lock().unwrap();
+            *streaming = true;
         }
         Ok(())
+
+
     }
+
 
     pub fn stop(&mut self) {
         if let Some(ref pipeline) = self.pipeline {
