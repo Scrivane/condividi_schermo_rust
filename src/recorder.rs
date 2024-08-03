@@ -43,6 +43,10 @@ async fn run() -> ashpd::Result<u32> {
     Ok(valnode)
 }
 
+
+
+#[cfg(target_os = "linux")]
+use std::env;
 pub struct ScreenRecorder {
     pipeline: Option<Pipeline>,
     recording: bool,
@@ -116,6 +120,8 @@ impl ScreenRecorder {
             message: format!("Failed to create Tokio runtime: {}", e),
         })?;
 
+        if   env::var("WAYLAND_DISPLAY").is_ok(){
+
         let valnod = match rt.block_on(run()) {
             Ok(value) => value,
             Err(e) => {
@@ -125,12 +131,7 @@ impl ScreenRecorder {
             }
         };
 
-        let src = gst::ElementFactory::make("pipewiresrc")
-            .build()
-            .map_err(|_| ServerError {
-                message: "Failed to create pipewiresrc".to_string(),
-            })?;
-        src.set_property("fd", &(valnod as i32));
+
 
         let pipeline_description = format!(
             r#"
@@ -158,6 +159,25 @@ impl ScreenRecorder {
         println!("su linux all 'id {}", valnod);
 
         Ok(pipeline)
+
+
+    }else  {
+
+        let videosrc = gst::ElementFactory::make("ximagesrc")   //non funziona con wayland ma solo xdg open 
+        .property("use-damage", false)
+        .build()
+        .map_err(|_| ServerError {
+            message: "Failed to create pipewiresrc".to_string(),
+        })?;
+
+        Self::create_common_pipeline(videosrc)
+  
+        
+    }
+
+
+
+        
     }
 
     #[cfg(target_os = "windows")]
