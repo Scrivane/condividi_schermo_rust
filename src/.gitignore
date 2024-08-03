@@ -1,0 +1,11 @@
+# Ignore the target directory
+target/
+
+# Ignore Rust's Cargo.lock file
+Cargo.lock
+
+# Ignore build artifacts
+*.o
+*.so
+*.dylib
+*.exe
