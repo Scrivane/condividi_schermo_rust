@@ -36,6 +36,8 @@ impl VideoPlayer {
 
 
         let udpsrc = gst::ElementFactory::make("udpsrc")
+            .property("multicast-group", &"224.1.1.1")
+            .property("auto-multicast", &true)
             .property("port", &5000)
             .property("caps", &gst::Caps::new_empty_simple("application/x-rtp"))
             .build()
@@ -118,7 +120,7 @@ impl VideoPlayer {
             //the thread check if there are new message in the bus, if there are not, probably the stream is ended
             //so close the render window
             thread::spawn(move || {
-                let timeout = Duration::from_secs(5);
+                let timeout = Duration::from_secs(50);
                 let mut last_msg_time = std::time::Instant::now();
 
 

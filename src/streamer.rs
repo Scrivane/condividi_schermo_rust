@@ -133,6 +133,8 @@ impl ScreenStreamer {
             .map_err(|_| ServerError {
                 message: "Failed to create queue4".to_string(),
             })?;
+
+        /*
         //set properties to udp sink for connection
         let udpsink = gst::ElementFactory::make("udpsink")
             .property("host", &"127.0.0.1")
@@ -140,6 +142,18 @@ impl ScreenStreamer {
             .build()
             .map_err(|_| ServerError {
                 message: "Failed to create udpsink".to_string(),
+            })?;
+
+         */
+
+
+        //set properties to udp sink for connection
+        let udpmulticastsink = gst::ElementFactory::make("udpsink")
+            .property("host", &"224.1.1.1") //use a multicast address
+            .property("port", &5000)
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create multiudpsink".to_string(),
             })?;
 
 
@@ -156,7 +170,7 @@ impl ScreenStreamer {
             &queue3,
             &rtph264pay,
             &queue4,
-            &udpsink,
+            &udpmulticastsink,
         ]).map_err(|_| ServerError {
             message: "Failed to add elements to pipeline".to_string(),
         })?;
@@ -172,7 +186,7 @@ impl ScreenStreamer {
             &queue3,
             &rtph264pay,
             &queue4,
-            &udpsink,
+            &udpmulticastsink,
         ]).map_err(|_| ServerError {
             message: "Failed to link elements".to_string(),
         })?;
@@ -195,7 +209,7 @@ impl ScreenStreamer {
     }
     pub fn stop(&mut self) {
         if let Some(ref pipeline) = self.pipeline {
-            pipeline.set_state(State::Null).map(|_| ());
+            let _ = pipeline.set_state(State::Null).map(|_| ());
         }
         self.pipeline = None;
         self.streaming = false;
