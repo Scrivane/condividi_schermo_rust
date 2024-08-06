@@ -2,6 +2,22 @@ use gst::prelude::*;
 use gst::{Pipeline, State};
 use std::fmt;
 
+#[cfg(target_os = "linux")]
+use ashpd::{
+    desktop::{
+        screencast::{CursorMode, Screencast, SourceType},
+        PersistMode,
+    },
+    WindowIdentifier,
+};
+#[cfg(target_os = "linux")]
+use tokio::runtime::Runtime;
+
+
+
+
+
+
 pub struct ScreenStreamer {
     pipeline: Option<Pipeline>,
     streaming: bool,
@@ -32,6 +48,10 @@ impl ScreenStreamer {
 
         #[cfg(target_os = "windows")]
         let pipeline = Self::create_pipeline_windows()?;
+
+
+        #[cfg(target_os = "linux")]
+        let pipeline=Self::create_pipeline_linux_wayland()?;
 
 
         let bus = pipeline.bus().unwrap();
@@ -78,18 +98,109 @@ impl ScreenStreamer {
         Self::create_common_pipeline(videosrc)
     }
 
+    #[cfg(target_os = "linux")]
+    async fn run() -> ashpd::Result<u32> {
+        let proxy = Screencast::new().await?;
+        let mut valnode: u32 = 0;
+
+        let session = proxy.create_session().await?;
+        proxy
+            .select_sources(
+                &session,
+                CursorMode::Metadata,
+                SourceType::Monitor | SourceType::Window,
+                true,
+                None,
+                PersistMode::DoNot,
+            )
+            .await?;
+
+        let response = proxy
+            .start(&session, &WindowIdentifier::default())
+            .await?
+            .response()?;
+        response.streams().iter().for_each(|stream| {
+            println!("node id: {}", stream.pipe_wire_node_id());
+            println!("size: {:?}", stream.size());
+            println!("position: {:?}", stream.position());
+            valnode = stream.pipe_wire_node_id();
+        });
+        Ok(valnode)
+    }
+    
+    #[cfg(target_os = "linux")]
+    fn create_pipeline_linux_wayland() -> Result<Pipeline, ServerError> {
+        let rt = Runtime::new().map_err(|e| ServerError {
+            message: format!("Failed to create Tokio runtime: {}", e),
+        })?;
+
+        let valnod = match rt.block_on(Self::run()) {
+            Ok(value) => value,
+            Err(e) => {
+                return Err(ServerError {
+                    message: format!("Failed to run async screencast session: {}", e),
+                })
+            }
+        };
+
+       // thread::sleep(Duration::from_secs(3600));
+
+        let videosrc = gst::ElementFactory::make("pipewiresrc")
+            .property("path",valnod.to_string())
+           // .property("monitor-index", &0)
+            .build()
+            .map_err(|_| ServerError { message: "Failed to create pipewiresrc".to_string()})?;
+
+        Self::create_common_pipeline(videosrc)
+    }
+
     fn create_common_pipeline(videosrc: gst::Element) -> Result<Pipeline, ServerError> {
-        let capsfilter = gst::ElementFactory::make("capsfilter")
+
+
+
+        //linux
+        let videoscale = gst::ElementFactory::make("videoscale").build()
+        .map_err(|_| ServerError {
+            message: "Failed to create videoscale".to_string(),
+        })?;
+
+        let capsfilterdim = gst::ElementFactory::make("capsfilter")
+        .property(
+            "caps",
+            gst::Caps::builder("video/x-raw")
+                .field("width", 1280).field("height",720 )
+                .build(),
+        ).build().map_err(|_| ServerError {
+            message: "Failed to create capsfilterdim".to_string(),
+        })?;
+
+        let videoRate = gst::ElementFactory::make("videorate").build()
+        .map_err(|_| ServerError {
+            message: "Failed to create videoRate".to_string(),
+        })?;
+
+
+    
+
+
+
+
+
+
+
+        //
+       
+       let capsfilter = gst::ElementFactory::make("capsfilter")
             .property(
                 "caps",
                 gst::Caps::builder("video/x-raw")
                     .field("framerate", &gst::Fraction::new(30, 1))
                     .build(),
-            )
-            .build()
+            ).build()
             .map_err(|_| ServerError {
                 message: "Failed to create capsfilter".to_string(),
             })?;
+
 
         let queue1 = gst::ElementFactory::make("queue")
             .build()
@@ -162,6 +273,16 @@ impl ScreenStreamer {
         //add elements to the pipeline
         pipeline.add_many(&[
             &videosrc,
+//linux
+
+            &videoscale,
+            &capsfilterdim,
+            &videoRate,
+
+            //linux
+
+
+
             &capsfilter,
             &queue1,
             &videoconvert,
@@ -178,6 +299,16 @@ impl ScreenStreamer {
 
         gst::Element::link_many(&[
             &videosrc,
+
+//linux
+
+            &videoscale,
+            &capsfilterdim,
+            &videoRate,
+
+//linux
+            
+
             &capsfilter,
             &queue1,
             &videoconvert,

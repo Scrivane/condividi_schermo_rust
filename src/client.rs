@@ -64,6 +64,11 @@ impl VideoPlayer {
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'queue3'".to_string()})?;
 
+
+        let videoconvert = gst::ElementFactory::make("videoconvert")
+            .build()
+            .map_err(|_| ClientError { message: "Failed to create element 'videoconvert'".to_string()})?;
+
         let autovideosink = gst::ElementFactory::make("autovideosink")
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'autovideosink'".to_string()})?;
@@ -78,6 +83,12 @@ impl VideoPlayer {
             &queue2,
             &ffdec_h264,
             &queue3,
+
+            //linux
+        
+            &videoconvert,
+
+            //
             &autovideosink,
         ]).map_err(|_| ClientError { message: "Failed to add elements to pipeline".to_string()})?;
 
@@ -89,6 +100,11 @@ impl VideoPlayer {
             &queue2,
             &ffdec_h264,
             &queue3,
+
+            //linux
+            &videoconvert,
+
+            //
             &autovideosink,
         ]).map_err(|_| ClientError { message: "Failed to link elements".to_string()})?;
 
