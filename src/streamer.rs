@@ -1,6 +1,7 @@
 use gst::prelude::*;
 use gst::{Pipeline, State};
 use std::fmt;
+use cfg_if::cfg_if;
 
 #[cfg(target_os = "linux")]
 use ashpd::{
@@ -139,7 +140,7 @@ impl ScreenStreamer {
     
     #[cfg(target_os = "linux")]
     fn create_pipeline_linux_wayland() -> Result<Pipeline, ServerError> {
-        let rt = Runtime::new().map_err(|e| ServerError {
+        let rt = Runtime::new().map_err(|e| ServerError {  //caromai rendi un thread a parte
             message: format!("Failed to create Tokio runtime: {}", e),
         })?;
 
@@ -165,30 +166,35 @@ impl ScreenStreamer {
 
     fn create_common_pipeline(videosrc: gst::Element) -> Result<Pipeline, ServerError> {
 
+       
 
 
-        //linux
-        /*
-        let videoscale = gst::ElementFactory::make("videoscale").build()
-        .map_err(|_| ServerError {
-            message: "Failed to create videoscale".to_string(),
-        })?;
+            cfg_if! {
+                if #[cfg(target_os = "linux")] {
+                                    //linux
+                                        
+                                    let videoscale = gst::ElementFactory::make("videoscale").build()
+                                    .map_err(|_| ServerError {
+                                        message: "Failed to create videoscale".to_string(),
+                                    })?;
 
-        let capsfilterdim = gst::ElementFactory::make("capsfilter")
-        .property(
-            "caps",
-            gst::Caps::builder("video/x-raw")
-                .field("width", 1280).field("height",720 )
-                .build(),
-        ).build().map_err(|_| ServerError {
-            message: "Failed to create capsfilterdim".to_string(),
-        })?;
+                                    let capsfilterdim = gst::ElementFactory::make("capsfilter")
+                                    .property(
+                                        "caps",
+                                        gst::Caps::builder("video/x-raw")
+                                            .field("width", 1280).field("height",720 )
+                                            .build(),
+                                    ).build().map_err(|_| ServerError {
+                                        message: "Failed to create capsfilterdim".to_string(),
+                                    })?;
 
-        let videoRate = gst::ElementFactory::make("videorate").build()
-        .map_err(|_| ServerError {
-            message: "Failed to create videoRate".to_string(),
-        })?;
-        */
+                                    let videoRate = gst::ElementFactory::make("videorate").build()
+                                    .map_err(|_| ServerError {
+                                        message: "Failed to create videoRate".to_string(),
+                    })?;
+                 } 
+            }
+ 
 
     
 
@@ -272,19 +278,30 @@ impl ScreenStreamer {
 
 
         let pipeline = Pipeline::new();
+        pipeline.add(&videosrc).map_err(|_| ServerError {
+            message: "Failed to add elements to pipeline for linux".to_string(),
+        })?;
+
+        cfg_if! {
+            if #[cfg(target_os = "linux")] {
+                 pipeline.add_many(&[
+               
+
+
+
+                    &videoscale,
+                    &capsfilterdim,
+                    &videoRate]).map_err(|_| ServerError {
+                        message: "Failed to add elements to pipeline for linux".to_string(),
+                    })?;
+                 } 
+            }
+
+        
 
         //add elements to the pipeline
         pipeline.add_many(&[
-            &videosrc,
-
-
-            /* linux
-            &videoscale,
-            &capsfilterdim,
-            &videoRate,
-            */
-
-
+      
             &capsfilter,
             &queue1,
             &videoconvert,
@@ -299,14 +316,39 @@ impl ScreenStreamer {
         })?;
 
 
+
+
+        cfg_if! {
+            if #[cfg(target_os = "linux")] {
+
+
         gst::Element::link_many(&[
             &videosrc,
 
-            /* linux
+            
             &videoscale,
             &capsfilterdim,
             &videoRate,
-             */
+            &capsfilter
+             
+        ]).map_err(|_| ServerError {
+            message: "Failed to link elements".to_string(),
+        })?;
+
+
+
+                 }
+            else{
+                gst::Element::link(&videosrc,  &capsfilter).map_err(|_| ServerError {
+                    message: "Failed to link elements".to_string(),
+                })?;
+
+
+            } 
+            }
+
+        gst::Element::link_many(&[
+
 
 
             &capsfilter,
