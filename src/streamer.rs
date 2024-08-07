@@ -20,7 +20,8 @@ use tokio::runtime::Runtime;
 
 pub struct ScreenStreamer {
     pipeline: Option<Pipeline>,
-    streaming: bool,
+    is_streaming: bool,
+    is_paused: bool,
 }
 
 //migliorare gestione errori
@@ -47,7 +48,7 @@ impl ScreenStreamer {
 
 
         #[cfg(target_os = "windows")]
-        let pipeline = Self::create_pipeline_windows()?;
+        let pipeline = Self::create_pipeline_windows(Some((400,400)))?;
 
 
         #[cfg(target_os = "linux")]
@@ -81,19 +82,27 @@ impl ScreenStreamer {
 
         Ok(Self {
             pipeline: Some(pipeline),
-            streaming: false,
+            is_streaming: false,
+            is_paused: false,
         })
 
 
     }
 
     #[cfg(target_os = "windows")]
-    fn create_pipeline_windows() -> Result<Pipeline, ServerError> {
+    fn create_pipeline_windows(capture_region: Option<(u32, u32)>) -> Result<Pipeline, ServerError> {
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
             .property("show-cursor",true)
             .property("monitor-index", &0)
+            .property("show-border", true)
             .build()
             .map_err(|_| ServerError { message: "Failed to create d3d11screencapturesrc".to_string()})?;
+
+       //se viene passato un area di cattura specifica
+        if let Some((x ,y)) = capture_region {
+            videosrc.set_property("crop-x", &x);
+            videosrc.set_property("crop-y", &y);
+        }
 
         Self::create_common_pipeline(videosrc)
     }
@@ -159,6 +168,7 @@ impl ScreenStreamer {
 
 
         //linux
+        /*
         let videoscale = gst::ElementFactory::make("videoscale").build()
         .map_err(|_| ServerError {
             message: "Failed to create videoscale".to_string(),
@@ -178,17 +188,10 @@ impl ScreenStreamer {
         .map_err(|_| ServerError {
             message: "Failed to create videoRate".to_string(),
         })?;
-
+        */
 
     
 
-
-
-
-
-
-
-        //
        
        let capsfilter = gst::ElementFactory::make("capsfilter")
             .property(
@@ -273,14 +276,13 @@ impl ScreenStreamer {
         //add elements to the pipeline
         pipeline.add_many(&[
             &videosrc,
-//linux
 
+
+            /* linux
             &videoscale,
             &capsfilterdim,
             &videoRate,
-
-            //linux
-
+            */
 
 
             &capsfilter,
@@ -300,14 +302,12 @@ impl ScreenStreamer {
         gst::Element::link_many(&[
             &videosrc,
 
-//linux
-
+            /* linux
             &videoscale,
             &capsfilterdim,
             &videoRate,
+             */
 
-//linux
-            
 
             &capsfilter,
             &queue1,
@@ -330,11 +330,12 @@ impl ScreenStreamer {
 
 
 
+
     pub fn start(&mut self) -> Result<(), String> {
-        // Imposta la pipeline in stato di riproduzione
+        // imposta la pipeline in stato di riproduzione
         let pipeline = self.pipeline.as_ref().unwrap();
         pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline to Playing".to_string())?;
-        self.streaming = true;
+        self.is_streaming = true;
 
         Ok(())
     }
@@ -343,7 +344,19 @@ impl ScreenStreamer {
             let _ = pipeline.set_state(State::Null).map(|_| ());
         }
         self.pipeline = None;
-        self.streaming = false;
+        self.is_streaming = false;
+    }
+
+    pub fn pause(&mut self){
+        //verifica che la pipeline sia esista e che lo streaming sia attivo
+        //poi va in pausa
+        if let Some(ref pipeline) = self.pipeline {
+            if self.is_streaming {
+                let _ = pipeline.set_state(State::Paused).map(|_| ());
+                self.is_paused = true;
+            }
+        }
+
     }
 
 }

@@ -265,7 +265,7 @@ impl ScreenRecorder {
 
     pub fn stop(&mut self) {
         if let Some(ref pipeline) = self.pipeline {
-            pipeline.set_state(State::Null).map(|_| ());
+            let _ = pipeline.set_state(State::Null).map(|_| ());
         }
         self.pipeline = None;
         self.recording = false;
