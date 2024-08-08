@@ -15,6 +15,13 @@ use ashpd::{
 use tokio::runtime::Runtime;
 
 
+pub struct DimensionToCrop { //usa u32
+    top: i32,
+    bottom: i32,
+    right: i32,
+    left:  i32
+}
+
 
 
 
@@ -22,7 +29,7 @@ use tokio::runtime::Runtime;
 pub struct ScreenStreamer {
     pipeline: Option<Pipeline>,
     is_streaming: bool,
-    is_paused: bool,
+    is_paused: bool
 }
 
 //migliorare gestione errori
@@ -90,6 +97,8 @@ impl ScreenStreamer {
 
     }
 
+
+
     #[cfg(target_os = "windows")]
     fn create_pipeline_windows(capture_region: Option<(u32, u32)>) -> Result<Pipeline, ServerError> {
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
@@ -105,7 +114,12 @@ impl ScreenStreamer {
             videosrc.set_property("crop-y", &y);
         }
 
-        Self::create_common_pipeline(videosrc)
+        //testa
+        Self::create_common_pipeline(videosrc, DimensionToCrop{top:0,bottom:100,right:400,left:30})
+        //
+
+
+        //Self::create_common_pipeline(videosrc)
     }
 
     #[cfg(target_os = "linux")]
@@ -161,10 +175,22 @@ impl ScreenStreamer {
             .build()
             .map_err(|_| ServerError { message: "Failed to create pipewiresrc".to_string()})?;
 
-        Self::create_common_pipeline(videosrc)
+            Self::create_common_pipeline(videosrc, DimensionToCrop{top:0,bottom:100,right:400,left:30})
+        
     }
 
-    fn create_common_pipeline(videosrc: gst::Element) -> Result<Pipeline, ServerError> {
+    fn create_common_pipeline(videosrc: gst::Element,crop:DimensionToCrop) -> Result<Pipeline, ServerError> {
+
+
+        let videocrop= gst::ElementFactory::make("videocrop")
+        .property("bottom", &crop.bottom)
+        .property("top", &crop.top)
+        .property("left", &crop.left)
+        .property("right", &crop.right)
+        .build()
+        .map_err(|_| ServerError {
+            message: "Failed to create rtph264pay".to_string(),
+        })?;
 
        
 
@@ -303,6 +329,7 @@ impl ScreenStreamer {
         pipeline.add_many(&[
       
             &capsfilter,
+            &videocrop, //casomai prova a spostare
             &queue1,
             &videoconvert,
             &queue2,
@@ -352,6 +379,7 @@ impl ScreenStreamer {
 
 
             &capsfilter,
+            &videocrop,
             &queue1,
             &videoconvert,
             &queue2,

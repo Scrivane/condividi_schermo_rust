@@ -137,6 +137,12 @@ impl VideoPlayer {
             //so close the render window
             thread::spawn(move || {
                 let timeout = Duration::from_secs(50);
+
+                //test   si andrebbe migliorato
+                //let timeout = Duration::from_secs(100000000);
+                //
+
+
                 let mut last_msg_time = std::time::Instant::now();
 
 
