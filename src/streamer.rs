@@ -24,8 +24,6 @@ pub struct DimensionToCrop { //usa u32
 
 
 
-
-
 pub struct ScreenStreamer {
     pipeline: Option<Pipeline>,
     is_streaming: bool,
@@ -54,9 +52,11 @@ impl ScreenStreamer {
     pub fn new() -> Result<Self, ServerError> {
         gst::init().unwrap();
 
+        //Qui avremo bisogno di un if che controlla se fare fullsize o crop
+        let capture_region = DimensionToCrop{top:300,bottom:300,right:300,left:300};
 
         #[cfg(target_os = "windows")]
-        let pipeline = Self::create_pipeline_windows(Some((400,400)))?;
+        let pipeline = Self::create_pipeline_windows(capture_region)?;
 
 
         #[cfg(target_os = "linux")]
@@ -100,7 +100,7 @@ impl ScreenStreamer {
 
 
     #[cfg(target_os = "windows")]
-    fn create_pipeline_windows(capture_region: Option<(u32, u32)>) -> Result<Pipeline, ServerError> {
+    fn create_pipeline_windows(capture_region: DimensionToCrop) -> Result<Pipeline, ServerError> {
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
             .property("show-cursor",true)
             .property("monitor-index", &0)
@@ -108,15 +108,9 @@ impl ScreenStreamer {
             .build()
             .map_err(|_| ServerError { message: "Failed to create d3d11screencapturesrc".to_string()})?;
 
-       //se viene passato un area di cattura specifica
-        if let Some((x ,y)) = capture_region {
-            videosrc.set_property("crop-x", &x);
-            videosrc.set_property("crop-y", &y);
-        }
 
-        //testa
-        Self::create_common_pipeline(videosrc, DimensionToCrop{top:0,bottom:100,right:400,left:30})
-        //
+        Self::create_common_pipeline(videosrc, capture_region)
+
 
 
         //Self::create_common_pipeline(videosrc)
@@ -151,7 +145,7 @@ impl ScreenStreamer {
         });
         Ok(valnode)
     }
-    
+
     #[cfg(target_os = "linux")]
     fn create_pipeline_linux_wayland() -> Result<Pipeline, ServerError> {
         let rt = Runtime::new().map_err(|e| ServerError {  //caromai rendi un thread a parte
@@ -167,35 +161,35 @@ impl ScreenStreamer {
             }
         };
 
-       // thread::sleep(Duration::from_secs(3600));
+        // thread::sleep(Duration::from_secs(3600));
 
         let videosrc = gst::ElementFactory::make("pipewiresrc")
             .property("path",valnod.to_string())
-           // .property("monitor-index", &0)
+            // .property("monitor-index", &0)
             .build()
             .map_err(|_| ServerError { message: "Failed to create pipewiresrc".to_string()})?;
 
-            Self::create_common_pipeline(videosrc, DimensionToCrop{top:0,bottom:100,right:400,left:30})
-        
+        Self::create_common_pipeline(videosrc, DimensionToCrop{top:0,bottom:100,right:400,left:30})
+
     }
 
     fn create_common_pipeline(videosrc: gst::Element,crop:DimensionToCrop) -> Result<Pipeline, ServerError> {
 
 
         let videocrop= gst::ElementFactory::make("videocrop")
-        .property("bottom", &crop.bottom)
-        .property("top", &crop.top)
-        .property("left", &crop.left)
-        .property("right", &crop.right)
-        .build()
-        .map_err(|_| ServerError {
-            message: "Failed to create rtph264pay".to_string(),
-        })?;
-
-       
+            .property("bottom", &crop.bottom)
+            .property("top", &crop.top)
+            .property("left", &crop.left)
+            .property("right", &crop.right)
+            .build()
+            .map_err(|_| ServerError {
+                message: "Failed to create rtph264pay".to_string(),
+            })?;
 
 
-            cfg_if! {
+
+
+        cfg_if! {
                 if #[cfg(target_os = "linux")] {
                                     //linux
                                         
@@ -220,12 +214,12 @@ impl ScreenStreamer {
                     })?;
                  } 
             }
- 
 
-    
 
-       
-       let capsfilter = gst::ElementFactory::make("capsfilter")
+
+
+
+        let capsfilter = gst::ElementFactory::make("capsfilter")
             .property(
                 "caps",
                 gst::Caps::builder("video/x-raw")
@@ -311,9 +305,6 @@ impl ScreenStreamer {
         cfg_if! {
             if #[cfg(target_os = "linux")] {
                  pipeline.add_many(&[
-               
-
-
 
                     &videoscale,
                     &capsfilterdim,
@@ -323,11 +314,11 @@ impl ScreenStreamer {
                  } 
             }
 
-        
+
 
         //add elements to the pipeline
         pipeline.add_many(&[
-      
+
             &capsfilter,
             &videocrop, //casomai prova a spostare
             &queue1,
@@ -347,7 +338,6 @@ impl ScreenStreamer {
 
         cfg_if! {
             if #[cfg(target_os = "linux")] {
-
 
         gst::Element::link_many(&[
             &videosrc,
@@ -375,8 +365,6 @@ impl ScreenStreamer {
             }
 
         gst::Element::link_many(&[
-
-
 
             &capsfilter,
             &videocrop,
