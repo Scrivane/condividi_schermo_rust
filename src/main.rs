@@ -80,10 +80,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 thread::spawn(move || {
                     let mut streamer = streamer_arc.lock().unwrap();
                     streamer.start().expect("Failed to start the streamer");
-                    println!("Server started...\n
+                    println!("Server started to URL {:?}...\n
                      Press CTRL+C to stop the server\n
                      Press CTRL+P to pause the stream\n
-                     Press CTRL+R to resume the stream");
+                     Press CTRL+R to resume the stream", streamer.get_url());
 
 
                     while let Ok(message) = receiver.recv() {
@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             streaming_thread.join().unwrap();
         }
         "client" => {
-            let mut player = VideoPlayer::new()?;
+            let mut player = VideoPlayer::new("suus")?;
             player.start()?;
             println!("Client started. Press Enter to stop...");
             let _ = std::io::stdin().read_line(&mut String::new());
