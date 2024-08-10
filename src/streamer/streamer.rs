@@ -1,7 +1,9 @@
+use std::sync::{Arc, Mutex};
 use gst::prelude::*;
 use gst::{Pipeline, State};
-use crate::error::ServerError;
 use cfg_if::cfg_if;
+use crate::streamer::error::ServerError;
+use crate::connection::server;
 
 #[cfg(target_os = "linux")]
 use ashpd::{
@@ -13,7 +15,7 @@ use ashpd::{
 };
 #[cfg(target_os = "linux")]
 use tokio::runtime::Runtime;
-
+use crate::connection::server::Server;
 
 pub struct DimensionToCrop { //usa u32
     top: i32,
@@ -26,13 +28,18 @@ pub struct DimensionToCrop { //usa u32
 
 pub struct ScreenStreamer {
     pipeline: Option<Pipeline>,
+    clients: Arc<Mutex<Vec<String>>>,
     is_streaming: bool,
-    is_paused: bool
+    is_paused: bool,
+
 }
 
 impl ScreenStreamer {
     pub fn new() -> Result<Self, ServerError> {
         gst::init().unwrap();
+
+
+
 
         //Qui avremo bisogno di un if che controlla se fare fullsize o crop
         let capture_region = DimensionToCrop{top:300,bottom:300,right:300,left:300};
@@ -72,6 +79,7 @@ impl ScreenStreamer {
 
         Ok(Self {
             pipeline: Some(pipeline),
+            clients: Arc::new(Mutex::new(vec![])),
             is_streaming: false,
             is_paused: false,
         })
@@ -266,8 +274,6 @@ impl ScreenStreamer {
                 message: "Failed to create udpsink".to_string(),
             })?;
 
-         */
-
 
         //set properties to udp sink for connection
         let multiudpsink = gst::ElementFactory::make("multiudpsink")
@@ -277,6 +283,11 @@ impl ScreenStreamer {
             .map_err(|_| ServerError {
                 message: "Failed to create multiudpsink".to_string(),
             })?;
+        */
+
+        let udpmulticastsink = gst::ElementFactory::make("multiudpsink")
+            .build()
+            .map_err(|_| ServerError { message: "Failed to create multiudpsink".to_string() })?;
 
 
         let pipeline = Pipeline::new();
@@ -368,17 +379,20 @@ impl ScreenStreamer {
 
     }
 
-    pub fn add_client_stream(&mut self, client_ip: String) -> Result<(), String> {
-        if let Some(ref pipeline) = self.pipeline {
-            let multiudpsink = pipeline.get_by_name("multiudpsink").unwrap();
-            let new_client = format!("{client_ip}:5000");
-            multiudpsink.set_property("clients", &new_client);
-            Ok(())
-        } else {
-            Err("Pipeline is not initialized".to_string())
-        }
+
+    pub fn add_client(&self, ip: String) -> Result<(), ServerError> {
+        let multiudpsink = self.pipeline.as_ref().unwrap().by_name("multiudpsink").unwrap();
+        multiudpsink.emit_by_name::<()>("add", &[&ip, &5000]);
+        self.clients.lock().unwrap().push(ip);
+        Ok(())
     }
 
+    pub fn remove_client(&self, ip: &str) -> Result<(), ServerError> {
+        let multiudpsink = self.pipeline.as_ref().unwrap().by_name("multiudpsink").unwrap();
+        multiudpsink.emit_by_name::<()>("remove", &[&ip, &5000]);
+        self.clients.lock().unwrap().retain(|x| x != ip);
+        Ok(())
+    }
 
 
 

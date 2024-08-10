@@ -2,7 +2,7 @@ use std::fmt;
 
 //migliorare gestione errori
 pub struct ServerError {
-    message: String,
+    pub(crate) message: String,
 }
 
 impl fmt::Debug for ServerError {

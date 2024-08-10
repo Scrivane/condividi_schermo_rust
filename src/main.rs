@@ -1,12 +1,10 @@
 mod streamer;
-mod client;
+mod connection;
 
-mod recorder;
+use streamer::streamer::ScreenStreamer;
+use streamer::client::StreamerClient;
+use connection::client::ServerClient;
 
-//mod gui
-
-use streamer::ScreenStreamer;
-use client::VideoPlayer;
 use std::env;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
@@ -14,6 +12,7 @@ use std::thread;
 use std::sync::mpsc;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crate::connection::server::Server;
 
 enum ControlMessage {
     Pause,
@@ -74,17 +73,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 handle_event(sender.clone()).unwrap();
             });
 
+            // Avvia il server
+            let server = Server::new(Arc::clone(&streamer_arc), 10); // Configura il server con il numero massimo di clienti
+            thread::spawn(move || {
+                server.start();
+            });
+
             // Thread per gestire lo streaming
             let streaming_thread = {
                 let streamer_arc = Arc::clone(&streamer_clone);
                 thread::spawn(move || {
                     let mut streamer = streamer_arc.lock().unwrap();
                     streamer.start().expect("Failed to start the streamer");
-                    println!("Server started to URL {:?}...\n
-                     Press CTRL+C to stop the server\n
-                     Press CTRL+P to pause the stream\n
-                     Press CTRL+R to resume the stream", streamer.get_url());
+                    println!(
+                        "Server started...\n\
+                         Press CTRL+C to stop the server\n\
+                         Press CTRL+P to pause the stream\n\
+                         Press CTRL+R to resume the stream",
 
+                    );
 
                     while let Ok(message) = receiver.recv() {
                         match message {
@@ -106,7 +113,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             streaming_thread.join().unwrap();
         }
         "client" => {
-            let mut player = VideoPlayer::new("suus")?;
+            // Client del server per ottenere l'IP
+            let server_ip = "0.0.0.0"; // Imposta l'IP del server
+            let server_port = 12345;     // Imposta la porta del server
+            let server_client = ServerClient::new(server_ip, server_port);
+            let ip_address = server_client.connect()?;
+
+            // Client dello streamer per avviare lo streaming
+            let mut player = StreamerClient::new()?;
             player.start()?;
             println!("Client started. Press Enter to stop...");
             let _ = std::io::stdin().read_line(&mut String::new());

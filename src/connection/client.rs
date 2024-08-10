@@ -1,26 +1,51 @@
-use tokio_tungstenite::connect_async;
-use futures_util::sink::SinkExt;
-use futures_util::stream::StreamExt;
-use tokio::net::UdpSocket;
-use tokio::time::Duration;
+use std::net::TcpStream;
+use std::io::{Read, Write};
+use std::fmt;
 
+pub struct ServerClient {
+    server_ip: String,
+    server_port: u16,
+}
 
-pub async fn request_connection() -> Result<(), Box<dyn std::error::Error>> {
-    let url = "ws://127.0.0.1:8080";
-    let (mut ws_stream, _) = connect_async(url).await.expect("Failed to connect");
+pub struct ClientError {
+    message: String,
+}
 
-    ws_stream.send("request_ip".into()).await?;
+impl fmt::Debug for ClientError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ClientError: {}", self.message)
+    }
+}
 
-    if let Some(Ok(msg)) = ws_stream.next().await {
-        if msg.is_text() {
-            let assigned_ip = msg.to_text().unwrap();
-            println!("Assigned IP: {}", assigned_ip);
+impl fmt::Display for ClientError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ClientError: {}", self.message)
+    }
+}
 
-            let socket = UdpSocket::bind("0.0.0.0:0").await?;
-            socket.connect(format!("{}:5000", assigned_ip)).await?;
+impl std::error::Error for ClientError {}
 
+impl ServerClient {
+    pub fn new(server_ip: &str, server_port: u16) -> Self {
+        ServerClient {
+            server_ip: server_ip.to_string(),
+            server_port,
         }
     }
 
-    Ok(())
+    pub fn connect(&self) -> Result<String, ClientError> {
+        let mut stream = TcpStream::connect((self.server_ip.as_str(), self.server_port))
+            .map_err(|_| ClientError { message: "Failed to connect to server".to_string() })?;
+
+        let mut ip_buffer = [0; 15];
+        let n = stream.read(&mut ip_buffer)
+            .map_err(|_| ClientError { message: "Failed to receive IP address from server".to_string() })?;
+        let ip = String::from_utf8_lossy(&ip_buffer[..n]);
+
+        if ip.contains("Connection refused") {
+            return Err(ClientError { message: ip.to_string() });
+        }
+
+        Ok(ip.to_string())
+    }
 }

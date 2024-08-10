@@ -1,10 +1,10 @@
 use gst::prelude::*;
 use gst::{ClockTime, Pipeline, State};
-use std::{fmt, thread};
+use std::{thread, fmt};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-pub struct VideoPlayer {
+pub struct StreamerClient {
     pipeline: Option<Pipeline>,
     is_streaming: Arc<Mutex<bool>>,
 }
@@ -26,56 +26,47 @@ impl fmt::Display for ClientError {
 }
 
 impl std::error::Error for ClientError {}
-impl VideoPlayer {
+
+impl StreamerClient {
     pub fn new() -> Result<Self, ClientError> {
-
         gst::init().unwrap();
-
 
         let pipeline = Pipeline::new();
 
-
         let udpsrc = gst::ElementFactory::make("udpsrc")
-            .property("multicast-group", &"224.1.1.1")
-            .property("auto-multicast", &true)
             .property("port", &5000)
             .property("caps", &gst::Caps::new_empty_simple("application/x-rtp"))
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string()})?;
+            .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string() })?;
 
         let queue1 = gst::ElementFactory::make("queue")
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'queue1'".to_string()})?;
+            .map_err(|_| ClientError { message: "Failed to create element 'queue1'".to_string() })?;
 
         let rtph264depay = gst::ElementFactory::make("rtph264depay")
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'rtph264depay'".to_string()})?;
+            .map_err(|_| ClientError { message: "Failed to create element 'rtph264depay'".to_string() })?;
 
         let queue2 = gst::ElementFactory::make("queue")
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'queue2'".to_string()})?;
+            .map_err(|_| ClientError { message: "Failed to create element 'queue2'".to_string() })?;
 
         let ffdec_h264 = gst::ElementFactory::make("avdec_h264")
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'avdec_h264'".to_string()})?;
-
+            .map_err(|_| ClientError { message: "Failed to create element 'avdec_h264'".to_string() })?;
 
         let queue3 = gst::ElementFactory::make("queue")
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'queue3'".to_string()})?;
-
+            .map_err(|_| ClientError { message: "Failed to create element 'queue3'".to_string() })?;
 
         let videoconvert = gst::ElementFactory::make("videoconvert")
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'videoconvert'".to_string()})?;
+            .map_err(|_| ClientError { message: "Failed to create element 'videoconvert'".to_string() })?;
 
         let autovideosink = gst::ElementFactory::make("autovideosink")
             .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'autovideosink'".to_string()})?;
+            .map_err(|_| ClientError { message: "Failed to create element 'autovideosink'".to_string() })?;
 
-
-
-        // Aggiungi gli elementi alla pipeline
         pipeline.add_many(&[
             &udpsrc,
             &queue1,
@@ -83,16 +74,10 @@ impl VideoPlayer {
             &queue2,
             &ffdec_h264,
             &queue3,
-
-            //linux
-
             &videoconvert,
-
-            //
             &autovideosink,
-        ]).map_err(|_| ClientError { message: "Failed to add elements to pipeline".to_string()})?;
+        ]).map_err(|_| ClientError { message: "Failed to add elements to pipeline".to_string() })?;
 
-        // Collega gli elementi nella pipeline usando link_many
         gst::Element::link_many(&[
             &udpsrc,
             &queue1,
@@ -100,26 +85,16 @@ impl VideoPlayer {
             &queue2,
             &ffdec_h264,
             &queue3,
-
-            //linux
             &videoconvert,
-
-            //
             &autovideosink,
-        ]).map_err(|_| ClientError { message: "Failed to link elements".to_string()})?;
+        ]).map_err(|_| ClientError { message: "Failed to link elements".to_string() })?;
 
-
-
-
-
-        // Imposta lo stato della pipeline in "pronta"
         pipeline.set_state(State::Ready).unwrap();
 
-
-        let is_streming = Arc::new(Mutex::new(false));
-        Ok(Self{
+        let is_streaming = Arc::new(Mutex::new(false));
+        Ok(Self {
             pipeline: Some(pipeline),
-            is_streaming: is_streming,
+            is_streaming,
         })
     }
 
@@ -132,19 +107,9 @@ impl VideoPlayer {
             let is_streaming = Arc::clone(&self.is_streaming);
             let pipeline_clone = self.pipeline.clone();
 
-            //NOT AN OPTIMAL SOLUTION
-            //the thread check if there are new message in the bus, if there are not, probably the stream is ended
-            //so close the render window
             thread::spawn(move || {
                 let timeout = Duration::from_secs(50);
-
-                //test   si andrebbe migliorato
-                //let timeout = Duration::from_secs(100000000);
-                //
-
-
                 let mut last_msg_time = std::time::Instant::now();
-
 
                 loop {
                     match bus.timed_pop(ClockTime::from_seconds(timeout.as_secs())) {
@@ -179,26 +144,19 @@ impl VideoPlayer {
                                 break;
                             }
                         }
-
-
                     }
                 }
                 if let Some(pipeline) = pipeline_clone {
                     pipeline.set_state(State::Null).unwrap();
                 }
                 println!("Closing render window.");
-                ClientError { message: "Closing render window".to_string() };
-
             });
 
             let mut streaming = self.is_streaming.lock().unwrap();
             *streaming = true;
         }
         Ok(())
-
-
     }
-
 
     pub fn stop(&mut self) {
         if let Some(ref pipeline) = self.pipeline {
