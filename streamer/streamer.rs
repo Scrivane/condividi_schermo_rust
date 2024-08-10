@@ -270,7 +270,7 @@ impl ScreenStreamer {
 
 
         //set properties to udp sink for connection
-        let udpmulticastsink = gst::ElementFactory::make("udpsink")
+        let multiudpsink = gst::ElementFactory::make("multiudpsink")
             .property("host", &"224.1.1.1") //use a multicast address
             .property("port", &5000)
             .build()
@@ -366,6 +366,17 @@ impl ScreenStreamer {
 
         Ok(pipeline)
 
+    }
+
+    pub fn add_client_stream(&mut self, client_ip: String) -> Result<(), String> {
+        if let Some(ref pipeline) = self.pipeline {
+            let multiudpsink = pipeline.get_by_name("multiudpsink").unwrap();
+            let new_client = format!("{client_ip}:5000");
+            multiudpsink.set_property("clients", &new_client);
+            Ok(())
+        } else {
+            Err("Pipeline is not initialized".to_string())
+        }
     }
 
 

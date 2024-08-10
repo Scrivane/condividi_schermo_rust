@@ -1,22 +1,26 @@
-use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::process::Command;
-use crate::models::{ClientRequest, ServerResponse};
+use tokio_tungstenite::connect_async;
+use futures_util::sink::SinkExt;
+use futures_util::stream::StreamExt;
+use tokio::net::UdpSocket;
+use tokio::time::Duration;
 
-pub async fn request_streaming_access(server_addr: &str, client_id: &str) -> Option<ServerResponse> {
-    let request = ClientRequest {
-        id: client_id.to_string(),
-    };
 
-    let mut socket = TcpStream::connect(server_addr).await.unwrap();
-    let request_data = serde_json::to_vec(&request).unwrap();
-    socket.write_all(&request_data).await.unwrap();
+pub async fn request_connection() -> Result<(), Box<dyn std::error::Error>> {
+    let url = "ws://127.0.0.1:8080";
+    let (mut ws_stream, _) = connect_async(url).await.expect("Failed to connect");
 
-    let mut buf = [0; 1024];
-    let n = socket.read(&mut buf).await.unwrap();
+    ws_stream.send("request_ip".into()).await?;
 
-    let response: ServerResponse = serde_json::from_slice(&buf[..n]).unwrap();
-    println!("Received IP: {}, Port: {}", response.ip, response.port);
+    if let Some(Ok(msg)) = ws_stream.next().await {
+        if msg.is_text() {
+            let assigned_ip = msg.to_text().unwrap();
+            println!("Assigned IP: {}", assigned_ip);
 
-    Some(response)
+            let socket = UdpSocket::bind("0.0.0.0:0").await?;
+            socket.connect(format!("{}:5000", assigned_ip)).await?;
+
+        }
+    }
+
+    Ok(())
 }
