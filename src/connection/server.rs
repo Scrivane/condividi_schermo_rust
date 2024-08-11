@@ -20,32 +20,33 @@ impl Server {
     }
 
     pub fn start(&self) {
-        let listener = TcpListener::bind("0.0.0.0:12345").unwrap();
+        let listener = TcpListener::bind("127.0.0.1:9000").unwrap();
+        println!("Server listening on port 9000");
 
         for stream in listener.incoming() {
             match stream {
                 Ok(mut stream) => {
-                    let mut clients_guard = self.clients.lock().unwrap();
-                    if clients_guard.len() >= self.max_clients {
-                        let _ = stream.write(b"Connection refused: Server is full.\n");
-                        continue;
-                    }
+                    println!("New connection: {}", stream.peer_addr().unwrap());
 
-                   //generate ip for each client
-                    let ip = format!("192.168.1.{}", clients_guard.len() + 2);
-
-                    // add ip to list of clients
-                    clients_guard.push(ip.clone());
-
-                    stream.write(ip.as_bytes()).unwrap();
-
-                    let streamer_clone = Arc::clone(&self.streamer);
-                    let clients_clone = Arc::clone(&self.clients);
+                    // Genera l'IP per il nuovo client
+                    let ip = format!("192.168.1.{}", self.clients.lock().unwrap().len() + 2);
                     let ip_clone = ip.clone();
 
+                    stream.write(ip_clone.as_bytes()).unwrap();
+
+                    self.streamer.lock().unwrap().add_client(ip).expect("TODO: panic message");
+
+                    self.clients.lock().unwrap().push(ip_clone);
+
+
+                    // Avvia un thread per gestire il client
+                    /*
                     thread::spawn(move || {
-                        Self::handle_client(stream, streamer_clone, clients_clone, ip_clone);
+                        Self::handle_client(stream, streamer_clone, self.clients.clone(), ip_clone);
                     });
+
+
+                     */
                 }
                 Err(e) => {
                     eprintln!("Connection failed: {}", e);
@@ -60,7 +61,9 @@ impl Server {
             Ok(size) => {
                 if size == 0 {
                     // Rimuovi l'IP dalla lista dei client
-                    streamer.lock().unwrap().remove_client(&ip).unwrap();
+                    if let Err(e) = streamer.lock().unwrap().remove_client(&ip) {
+                        eprintln!("Failed to remove client from streamer: {}", e);
+                    }
                     clients.lock().unwrap().retain(|x| x != &ip);
                     return;
                 }
@@ -71,6 +74,11 @@ impl Server {
                 false
             }
         } {}
+        // Rimuove il client dallo ScreenStreamer e dalla lista dei client
+        if let Err(e) = streamer.lock().unwrap().remove_client(&ip) {
+            eprintln!("Failed to remove client from streamer: {}", e);
+        }
+        clients.lock().unwrap().retain(|x| x != &ip);
     }
 
     pub fn list_clients(&self) -> Vec<String> {

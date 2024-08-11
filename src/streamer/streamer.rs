@@ -381,16 +381,34 @@ impl ScreenStreamer {
 
 
     pub fn add_client(&self, ip: String) -> Result<(), ServerError> {
-        let multiudpsink = self.pipeline.as_ref().unwrap().by_name("multiudpsink").unwrap();
-        multiudpsink.emit_by_name::<()>("add", &[&ip, &5000]);
-        self.clients.lock().unwrap().push(ip);
+        println!("Adding client {}", ip);
+        let ip_clone = ip.clone();
+
+        let multiudpsink = self.pipeline.as_ref()
+            .ok_or_else(|| ServerError { message: "Pipeline is not initialized".to_string() })?
+            .by_name("multiudpsink")
+            .ok_or_else(|| ServerError { message: "multiudpsink not found in pipeline".to_string() })?;
+
+        // Debug: Verifica se l'elemento esiste e stampa il tipo di elemento
+        println!("Element found: {:?}", multiudpsink);
+
+        // Emette il segnale. Non c'è valore di ritorno da gestire.
+        multiudpsink.emit_by_name_with_values("add", &[ip.into(), 5000.into()]);
+        println!("Successfully emitted 'add' signal");
+
+        // Aggiungi l'IP alla lista dei clienti
+        let mut clients = self.clients.lock().unwrap();
+        clients.push(ip_clone);
+        println!("Client added. Total clients: {}", clients.len());
+
         Ok(())
     }
 
     pub fn remove_client(&self, ip: &str) -> Result<(), ServerError> {
         let multiudpsink = self.pipeline.as_ref().unwrap().by_name("multiudpsink").unwrap();
-        multiudpsink.emit_by_name::<()>("remove", &[&ip, &5000]);
+        multiudpsink.emit_by_name_with_values("remove", &[ip.into(), 5000.into()]);
         self.clients.lock().unwrap().retain(|x| x != ip);
+        println!("Client {} removed", ip);
         Ok(())
     }
 

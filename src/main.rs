@@ -69,13 +69,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             let streamer_clone = Arc::clone(&streamer_arc);
 
             // Thread per ascoltare gli eventi della tastiera
-            thread::spawn(move || {
+            let _ = thread::spawn(move || {
                 handle_event(sender.clone()).unwrap();
             });
 
             // Avvia il server
-            let server = Server::new(Arc::clone(&streamer_arc), 10); // Configura il server con il numero massimo di clienti
-            thread::spawn(move || {
+            let server = Server::new(Arc::clone(&streamer_arc), 10);
+            let server_thread = thread::spawn(move || {
                 server.start();
             });
 
@@ -111,11 +111,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             streaming_thread.join().unwrap();
+            server_thread.join().unwrap();
+
+
         }
         "client" => {
             // Client del server per ottenere l'IP
-            let server_ip = "0.0.0.0"; // Imposta l'IP del server
-            let server_port = 12345;     // Imposta la porta del server
+            let server_ip = "127.0.0.1"; // Imposta l'IP del server
+            let server_port = 9000;     // Imposta la porta del server
             let server_client = ServerClient::new(server_ip, server_port);
             let ip_address = server_client.connect()?;
 

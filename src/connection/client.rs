@@ -34,6 +34,7 @@ impl ServerClient {
     }
 
     pub fn connect(&self) -> Result<String, ClientError> {
+        println!("Connecting to server at {}:{}", self.server_ip, self.server_port);
         let mut stream = TcpStream::connect((self.server_ip.as_str(), self.server_port))
             .map_err(|_| ClientError { message: "Failed to connect to server".to_string() })?;
 
@@ -45,6 +46,7 @@ impl ServerClient {
         if ip.contains("Connection refused") {
             return Err(ClientError { message: ip.to_string() });
         }
+        println!("My IP: {}", ip);
 
         Ok(ip.to_string())
     }
