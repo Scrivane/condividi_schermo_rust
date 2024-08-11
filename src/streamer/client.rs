@@ -3,6 +3,7 @@ use gst::{ClockTime, Pipeline, State};
 use std::{thread, fmt};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use gstreamer_rtsp_server::gio::ffi::g_action_print_detailed_name;
 
 pub struct StreamerClient {
     pipeline: Option<Pipeline>,
@@ -28,13 +29,29 @@ impl fmt::Display for ClientError {
 impl std::error::Error for ClientError {}
 
 impl StreamerClient {
-    pub fn new() -> Result<Self, ClientError> {
+    pub fn new(ip_and_port: String) -> Result<Self, ClientError> {
         gst::init().unwrap();
+
+        // Stampa l'indirizzo e la porta ricevuti
+        println!("ip_and_port: {}", ip_and_port);
+
+        // Separazione dell'indirizzo IP e della porta
+        let parts: Vec<&str> = ip_and_port.split(':').collect();
+
+        if parts.len() != 2 {
+            return Err(ClientError { message: "Invalid IP and port format".to_string() });
+        }
+
+        let ip = parts[0];
+        let port: i32 = parts[1].parse().map_err(|_| ClientError { message: "Failed to parse port".to_string() })?;
+
+
 
         let pipeline = Pipeline::new();
 
         let udpsrc = gst::ElementFactory::make("udpsrc")
-            .property("port", &5000)
+            .property("port", &port)
+            .property("address", &ip.to_string())
             .property("caps", &gst::Caps::new_empty_simple("application/x-rtp"))
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string() })?;

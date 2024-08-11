@@ -1,53 +1,34 @@
-use std::net::TcpStream;
-use std::io::{Read, Write};
-use std::fmt;
+use std::net::UdpSocket;
+use std::io;
 
-pub struct ServerClient {
-    server_ip: String,
-    server_port: u16,
-}
+pub struct DiscoveryClient;
 
-pub struct ClientError {
-    message: String,
-}
-
-impl fmt::Debug for ClientError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ClientError: {}", self.message)
+impl DiscoveryClient {
+    pub fn new() -> Self {
+        DiscoveryClient {}
     }
-}
 
-impl fmt::Display for ClientError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ClientError: {}", self.message)
-    }
-}
+    pub fn discover_server(&self) -> Result<String, io::Error> {
+        let socket = UdpSocket::bind("0.0.0.0:0")?; // Bind alla porta scelta
+        let server_addr = "255.255.255.255:9000"; // Broadcast al server di scoperta
 
-impl std::error::Error for ClientError {}
+        println!("Sending DISCOVERY message to {}", server_addr);
 
-impl ServerClient {
-    pub fn new(server_ip: &str, server_port: u16) -> Self {
-        ServerClient {
-            server_ip: server_ip.to_string(),
-            server_port,
+        socket.set_broadcast(true)?;
+        socket.send_to(b"DISCOVERY", server_addr)?;
+        println!("Sent DISCOVERY message");
+
+        let mut buf = [0; 1024];
+        match socket.recv_from(&mut buf) {
+            Ok((amt, _)) => {
+                let server_response = String::from_utf8_lossy(&buf[..amt]).to_string();
+                println!("Received response: {}", server_response);
+                Ok(server_response)
+            },
+            Err(e) => {
+                println!("Failed to receive response: {}", e);
+                Err(e)
+            }
         }
-    }
-
-    pub fn connect(&self) -> Result<String, ClientError> {
-        println!("Connecting to server at {}:{}", self.server_ip, self.server_port);
-        let mut stream = TcpStream::connect((self.server_ip.as_str(), self.server_port))
-            .map_err(|_| ClientError { message: "Failed to connect to server".to_string() })?;
-
-        let mut ip_buffer = [0; 15];
-        let n = stream.read(&mut ip_buffer)
-            .map_err(|_| ClientError { message: "Failed to receive IP address from server".to_string() })?;
-        let ip = String::from_utf8_lossy(&ip_buffer[..n]);
-
-        if ip.contains("Connection refused") {
-            return Err(ClientError { message: ip.to_string() });
-        }
-        println!("My IP: {}", ip);
-
-        Ok(ip.to_string())
     }
 }

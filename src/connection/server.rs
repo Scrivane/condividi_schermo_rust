@@ -1,87 +1,66 @@
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
+use std::collections::HashMap;
+use std::net::{UdpSocket, SocketAddr};
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::error::Error;
 use crate::streamer::streamer::ScreenStreamer;
 
-pub struct Server {
-    streamer: Arc<Mutex<ScreenStreamer>>,
-    clients: Arc<Mutex<Vec<String>>>,
-    max_clients: usize,
+pub struct DiscoveryServer {
+    clients: Arc<Mutex<HashMap<SocketAddr, String>>>,
+    streamer: Option<ScreenStreamer>
 }
 
-impl Server {
-    pub fn new(streamer: Arc<Mutex<ScreenStreamer>>, max_clients: usize) -> Self {
-        Server {
-            streamer,
-            clients: Arc::new(Mutex::new(Vec::new())),
-            max_clients,
+impl DiscoveryServer {
+    pub fn new( streamer: ScreenStreamer) -> Self {
+        Self {
+            clients: Arc::new(Mutex::new(HashMap::new())),
+            streamer: Some(streamer),
         }
     }
 
-    pub fn start(&self) {
-        let listener = TcpListener::bind("127.0.0.1:9000").unwrap();
-        println!("Server listening on port 9000");
+    pub fn run_discovery_listener(&self) -> Result<(), Box<dyn Error>> {
+        let socket = UdpSocket::bind("0.0.0.0:9000")?;
+        let clients = Arc::clone(&self.clients);
 
-        for stream in listener.incoming() {
-            match stream {
-                Ok(mut stream) => {
-                    println!("New connection: {}", stream.peer_addr().unwrap());
+        println!("Discovery server is listening on port 9000");
 
-                    // Genera l'IP per il nuovo client
-                    let ip = format!("192.168.1.{}", self.clients.lock().unwrap().len() + 2);
-                    let ip_clone = ip.clone();
-
-                    stream.write(ip_clone.as_bytes()).unwrap();
-
-                    self.streamer.lock().unwrap().add_client(ip).expect("TODO: panic message");
-
-                    self.clients.lock().unwrap().push(ip_clone);
-
-
-                    // Avvia un thread per gestire il client
-                    /*
-                    thread::spawn(move || {
-                        Self::handle_client(stream, streamer_clone, self.clients.clone(), ip_clone);
-                    });
-
-
-                     */
-                }
+        loop {
+            let mut buf = [0; 1024];
+            let (amt, src) = match socket.recv_from(&mut buf) {
+                Ok(result) => result,
                 Err(e) => {
-                    eprintln!("Connection failed: {}", e);
+                    println!("Error receiving data: {}", e);
+                    continue;
+                }
+            };
+
+            let received_message = String::from_utf8_lossy(&buf[..amt]);
+            println!("Received message: '{}' from {}", received_message, src);
+
+            if received_message.trim() == "DISCOVERY" {
+                let server_ip = "127.0.0.1"; // IP del server di streaming
+                let server_port = 5000; // Porta del server di streaming
+                let response = format!("{}:{}", server_ip, server_port);
+
+                if let Err(e) = socket.send_to(response.as_bytes(), &src) {
+                    println!("Failed to send response: {}", e);
+                } else {
+                    println!("Sent response '{}' to client {}", response, src);
+                }
+
+                // Salva l'IP e la porta del client
+                let mut clients = clients.lock().unwrap();
+                clients.insert(src, response);
+
+                // Usa `self.streamer` direttamente
+                if let Some(ref mut streamer) = self.streamer {
+                    streamer.add_client(src.to_string());
+                    println!("Client {} added to list", src);
                 }
             }
         }
     }
 
-    fn handle_client(mut stream: TcpStream, streamer: Arc<Mutex<ScreenStreamer>>, clients: Arc<Mutex<Vec<String>>>, ip: String) {
-        let mut buffer = [0; 512];
-        while match stream.read(&mut buffer) {
-            Ok(size) => {
-                if size == 0 {
-                    // Rimuovi l'IP dalla lista dei client
-                    if let Err(e) = streamer.lock().unwrap().remove_client(&ip) {
-                        eprintln!("Failed to remove client from streamer: {}", e);
-                    }
-                    clients.lock().unwrap().retain(|x| x != &ip);
-                    return;
-                }
-                true
-            }
-            Err(_) => {
-                eprintln!("An error occurred, terminating connection with {}", ip);
-                false
-            }
-        } {}
-        // Rimuove il client dallo ScreenStreamer e dalla lista dei client
-        if let Err(e) = streamer.lock().unwrap().remove_client(&ip) {
-            eprintln!("Failed to remove client from streamer: {}", e);
-        }
-        clients.lock().unwrap().retain(|x| x != &ip);
-    }
-
-    pub fn list_clients(&self) -> Vec<String> {
-        self.clients.lock().unwrap().clone()
+    pub fn get_clients(&self) -> Arc<Mutex<HashMap<SocketAddr, String>>> {
+        Arc::clone(&self.clients)
     }
 }

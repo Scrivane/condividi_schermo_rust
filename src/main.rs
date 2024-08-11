@@ -3,16 +3,16 @@ mod connection;
 
 use streamer::streamer::ScreenStreamer;
 use streamer::client::StreamerClient;
-use connection::client::ServerClient;
+use connection::client::DiscoveryClient;
+use connection::server::DiscoveryServer;
 
 use std::env;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::sync::mpsc;
+use std::thread;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use crate::connection::server::Server;
 
 enum ControlMessage {
     Pause,
@@ -65,67 +65,60 @@ fn main() -> Result<(), Box<dyn Error>> {
             let (sender, receiver) = mpsc::channel();
             let streamer = ScreenStreamer::new()?;
             let streamer_arc = Arc::new(Mutex::new(streamer));
+            let streamer_arc_clone = Arc::clone(&streamer_arc);
 
-            let streamer_clone = Arc::clone(&streamer_arc);
-
-            // Thread per ascoltare gli eventi della tastiera
-            let _ = thread::spawn(move || {
-                handle_event(sender.clone()).unwrap();
-            });
-
-            // Avvia il server
-            let server = Server::new(Arc::clone(&streamer_arc), 10);
+            // Avvia il server di scoperta in un thread separato
+            let discovery_server = DiscoveryServer::new(streamer_arc_clone);
             let server_thread = thread::spawn(move || {
-                server.start();
+                println!("Starting discovery server...");
+                discovery_server.run_discovery_listener().expect("Failed to run discovery server");
             });
 
-            // Thread per gestire lo streaming
-            let streaming_thread = {
-                let streamer_arc = Arc::clone(&streamer_clone);
-                thread::spawn(move || {
-                    let mut streamer = streamer_arc.lock().unwrap();
-                    streamer.start().expect("Failed to start the streamer");
-                    println!(
-                        "Server started...\n\
-                         Press CTRL+C to stop the server\n\
-                         Press CTRL+P to pause the stream\n\
-                         Press CTRL+R to resume the stream",
+            // Avvia lo streaming dopo che il server è avviato
+            {
+                let mut streamer = streamer_arc.lock().unwrap();
+                streamer.start().expect("Failed to start the streamer");
+                println!(
+                    "Streamer started\n\
+                     Press CTRL+C to stop the server\n\
+                     Press CTRL+P to pause the stream\n\
+                     Press CTRL+R to resume the stream"
+                );
 
-                    );
+                // Gestisci gli eventi della tastiera
+                handle_event(sender)?;
+            }
 
-                    while let Ok(message) = receiver.recv() {
-                        match message {
-                            ControlMessage::Pause => {
-                                streamer.pause();
-                            }
-                            ControlMessage::Resume => {
-                                streamer.start().unwrap();
-                            }
-                            ControlMessage::Stop => {
-                                streamer.stop();
-                                break;
-                            }
-                        }
+            // Gestisci i comandi di controllo
+            while let Ok(message) = receiver.recv() {
+                let mut streamer = streamer_arc.lock().unwrap();
+                match message {
+                    ControlMessage::Pause => {
+                        streamer.pause();
                     }
-                })
-            };
+                    ControlMessage::Resume => {
+                        streamer.start().unwrap();
+                    }
+                    ControlMessage::Stop => {
+                        streamer.stop();
+                        break;
+                    }
+                }
+            }
 
-            streaming_thread.join().unwrap();
-            server_thread.join().unwrap();
 
-
+            server_thread.join().expect("Server thread panicked");
         }
         "client" => {
-            // Client del server per ottenere l'IP
-            let server_ip = "127.0.0.1"; // Imposta l'IP del server
-            let server_port = 9000;     // Imposta la porta del server
-            let server_client = ServerClient::new(server_ip, server_port);
-            let ip_address = server_client.connect()?;
+            // Client per scoprire il server e ottenere l'IP
+            let discovery_client = DiscoveryClient::new();
+            let server_ip = discovery_client.discover_server()?; // Scopre il server e ottiene l'IP
 
             // Client dello streamer per avviare lo streaming
-            let mut player = StreamerClient::new()?;
+            let mut player = StreamerClient::new(server_ip.clone())?;
+
             player.start()?;
-            println!("Client started. Press Enter to stop...");
+            println!("Client started streaming from server at {}. Press Enter to stop...", server_ip);
             let _ = std::io::stdin().read_line(&mut String::new());
             player.stop();
         }
