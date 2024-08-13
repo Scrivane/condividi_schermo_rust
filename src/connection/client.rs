@@ -15,7 +15,7 @@ impl DiscoveryClient {
         Ok(DiscoveryClient { socket, local_port })
     }
 
-    pub fn discover_server(&self) -> Result<i32, io::Error> {
+    pub fn discover_server(&self) -> Result<(String,i32), io::Error> {
         let server_addr = "255.255.255.255:9000"; // Broadcast al server di scoperta
 
         println!("Sending DISCOVERY message to {}", server_addr);
@@ -29,10 +29,11 @@ impl DiscoveryClient {
 
         let mut buf = [0; 1024];
         match self.socket.recv_from(&mut buf) {
-            Ok((amt, _)) => {
+            Ok((amt, src)) => {
                 let server_response = String::from_utf8_lossy(&buf[..amt]).to_string();
-                println!("Received response: {}", server_response);
-                Ok(self.local_port as i32)
+                println!("Received response: {} from {}", server_response,src);
+                let ip = src.to_string().split(":").next().unwrap().to_string(); //takes only the ip address
+                Ok((ip, self.local_port as i32))
             },
             Err(e) => {
                 println!("Failed to receive response: {}", e);

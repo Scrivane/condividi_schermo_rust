@@ -28,16 +28,17 @@ impl fmt::Display for ClientError {
 impl std::error::Error for ClientError {}
 
 impl StreamerClient {
-    pub fn new(port: i32) -> Result<Self, ClientError> {
+    pub fn new(ip: String, port: i32) -> Result<Self, ClientError> {
         gst::init().unwrap();
 
 
-        println!("Port: {}", port);
+        println!("IP:{} Port: {}", ip,port);
 
         let pipeline = Pipeline::new();
 
         let udpsrc = gst::ElementFactory::make("udpsrc")
             .property("port", &port)
+            .property("address", &ip)
             .property("caps", &gst::Caps::new_empty_simple("application/x-rtp"))
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string() })?;

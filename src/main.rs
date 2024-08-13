@@ -106,9 +106,9 @@ fn start_streamer() -> Result<(), Box<dyn Error>> {
 
 fn start_client() -> Result<(), Box<dyn Error>> {
     let discovery_client = DiscoveryClient::new()?;
-    let client_port = discovery_client.discover_server()?;
+    let (client_ip,client_port) = discovery_client.discover_server()?;
     let client_port_clone = client_port.clone();
-    let mut player = StreamerClient::new(client_port)?;
+    let mut player = StreamerClient::new(client_ip,client_port)?;
 
     player.start()?;
     println!("Client started at port {}. Press Enter to stop...", client_port_clone);
