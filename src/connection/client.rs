@@ -1,34 +1,55 @@
 use std::net::UdpSocket;
 use std::io;
 
-pub struct DiscoveryClient;
+pub struct DiscoveryClient{
+    local_port: u16,
+    socket: UdpSocket,
+}
 
 impl DiscoveryClient {
-    pub fn new() -> Self {
-        DiscoveryClient {}
+    pub fn new() -> Result<Self, io::Error> {
+        let socket = UdpSocket::bind("0.0.0.0:0")?;
+        let local_addr = socket.local_addr()?;
+        let local_port = local_addr.port();
+
+        Ok(DiscoveryClient { socket, local_port })
     }
 
-    pub fn discover_server(&self) -> Result<String, io::Error> {
-        let socket = UdpSocket::bind("0.0.0.0:0")?; // Bind alla porta scelta
+    pub fn discover_server(&self) -> Result<i32, io::Error> {
         let server_addr = "255.255.255.255:9000"; // Broadcast al server di scoperta
 
         println!("Sending DISCOVERY message to {}", server_addr);
 
-        socket.set_broadcast(true)?;
-        socket.send_to(b"DISCOVERY", server_addr)?;
-        println!("Sent DISCOVERY message");
+        self.socket.set_broadcast(true)?;
+
+        let discovery_message = "DISCOVERY";
+        self.socket.send_to(discovery_message.as_bytes(), server_addr)?;
+        println!("Sent DISCOVERY message with local port: {}", self.local_port);
+
 
         let mut buf = [0; 1024];
-        match socket.recv_from(&mut buf) {
+        match self.socket.recv_from(&mut buf) {
             Ok((amt, _)) => {
                 let server_response = String::from_utf8_lossy(&buf[..amt]).to_string();
                 println!("Received response: {}", server_response);
-                Ok(server_response)
+                Ok(self.local_port as i32)
             },
             Err(e) => {
                 println!("Failed to receive response: {}", e);
                 Err(e)
             }
         }
+    }
+
+    pub fn notify_disconnection(&self) -> Result<(), io::Error> {
+        let server_addr = "255.255.255.255:9000"; // L'indirizzo del server
+
+        println!("Sending DISCONNECT message to {}", server_addr);
+
+        let disconnect_message = format!("DISCONNECT:{}", self.local_port);
+        self.socket.send_to(disconnect_message.as_bytes(), server_addr)?;
+        println!("Sent DISCONNECT message with local port: {}", self.local_port);
+
+        Ok(())
     }
 }

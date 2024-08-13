@@ -236,7 +236,10 @@ impl ScreenStreamer {
                 message: "Failed to create queue4".to_string(),
             })?;
 
-        let udpmulticastsink = gst::ElementFactory::make("multiudpsink").build()
+        let udpmulticastsink = gst::ElementFactory::make("multiudpsink")
+            .property("clients", "")
+            .name("multiudpsink")
+            .build()
             .map_err(|_| ServerError {
                 message: "Failed to create multiudpsink".to_string(),
             })?;
@@ -310,12 +313,39 @@ impl ScreenStreamer {
     }
 
     pub fn add_client(&mut self, client_addr: String) {
-        let mut clients = self.clients.lock().unwrap();
-        clients.push(client_addr.clone());
+        {
+            let mut clients = self.clients.lock().unwrap();
+            clients.push(client_addr.clone());
+        }
+
 
         println!("Added client: {}", client_addr);
 
         // Aggiorna il multiudpsink
+        self.update_multiudpsink();
+    }
+
+    pub fn remove_client(&self, client_addr: String) -> Result<(), ServerError> {
+        {
+            let mut clients = self.clients.lock().map_err(|e| ServerError {
+                message: format!("Failed to lock clients mutex: {}", e),
+            })?;
+            if let Some(index) = clients.iter().position(|addr| addr == &client_addr) {
+                clients.remove(index);
+            }
+        }
+
+        self.update_multiudpsink();
+        println!("Removed client: {}", client_addr);
+        Ok(())
+    }
+
+    pub fn update_clients(&self, client_list_str: String) {
+        let client_list = client_list_str.split(',').map(|s| s.to_string()).collect();
+        {
+            let mut clients = self.clients.lock().unwrap();
+            *clients = client_list;
+        }
         self.update_multiudpsink();
     }
 
@@ -325,41 +355,22 @@ impl ScreenStreamer {
                 .by_name("multiudpsink")
                 .expect("Multiudpsink element not found");
 
+
+
             let clients = self.clients.lock().unwrap();
             let addresses: Vec<String> = clients.iter().map(|addr| addr.to_string()).collect();
             let addresses_str = addresses.join(",");
 
+
             multiudpsink
                 .set_property("clients", &addresses_str);
+
+
         }
     }
 
 
-    pub fn remove_client(&self, ip: &str) -> Result<(), ServerError> {
-        let multiudpsink = self.pipeline.as_ref()
-            .ok_or_else(|| ServerError { message: "Pipeline is not initialized".to_string() })?
-            .by_name("multiudpsink")
-            .ok_or_else(|| ServerError { message: "multiudpsink not found in pipeline".to_string() })?;
 
-        let port = 5000; // Porta per il client
-
-        // Ottieni l'attuale lista di indirizzi IP e porte
-        let mut clients = multiudpsink.property::<Vec<String>>("clients");
-
-        // Rimuovi il client dalla lista
-        clients.retain(|client| client != &format!("{}:{}", ip, port));
-
-        // Imposta la proprietà aggiornata su multiudpsink
-        multiudpsink.set_property("clients", &clients);
-
-
-        // Rimuovi l'IP dalla lista dei clienti nel `ScreenStreamer`
-        let mut clients = self.clients.lock().unwrap();
-        clients.retain(|x| x != ip);
-        println!("Client {} removed. Total clients: {}", ip, clients.len());
-
-        Ok(())
-    }
 
     pub fn start(&mut self) -> Result<(), String> {
         let pipeline = self.pipeline.as_ref().ok_or_else(|| "Pipeline is not initialized".to_string())?;

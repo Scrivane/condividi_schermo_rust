@@ -1,25 +1,22 @@
-use std::collections::HashMap;
-use std::net::{UdpSocket, SocketAddr};
-use std::sync::{Arc, Mutex};
+use std::net::{UdpSocket};
+use std::sync::mpsc;
 use std::error::Error;
-use crate::streamer::streamer::ScreenStreamer;
 
 pub struct DiscoveryServer {
-    clients: Arc<Mutex<HashMap<SocketAddr, String>>>,
-    streamer: Option<ScreenStreamer>
+    sender: mpsc::Sender<String>,
+    clients: String,
 }
 
 impl DiscoveryServer {
-    pub fn new( streamer: ScreenStreamer) -> Self {
+    pub fn new(sender: mpsc::Sender<String>) -> Self {
         Self {
-            clients: Arc::new(Mutex::new(HashMap::new())),
-            streamer: Some(streamer),
+            sender,
+            clients: String::new(),
         }
     }
 
-    pub fn run_discovery_listener(&self) -> Result<(), Box<dyn Error>> {
+    pub fn run_discovery_listener(&mut self) -> Result<(), Box<dyn Error>> {
         let socket = UdpSocket::bind("0.0.0.0:9000")?;
-        let clients = Arc::clone(&self.clients);
 
         println!("Discovery server is listening on port 9000");
 
@@ -47,20 +44,32 @@ impl DiscoveryServer {
                     println!("Sent response '{}' to client {}", response, src);
                 }
 
-                // Salva l'IP e la porta del client
-                let mut clients = clients.lock().unwrap();
-                clients.insert(src, response);
 
-                // Usa `self.streamer` direttamente
-                if let Some(ref mut streamer) = self.streamer {
-                    streamer.add_client(src.to_string());
-                    println!("Client {} added to list", src);
+                // Aggiunge l'indirizzo del client alla lista formatta già correttamente per ScreenStreamer
+                if !self.clients.is_empty() {
+                    self.clients.push_str(&format!(",{}", src.to_string()));
+                }
+                else{
+                    self.clients.push_str(&format!("{}", src.to_string()));
+                }
+
+
+                // Invia l'indirizzo del client al main tramite il canale
+
+                //if let Err(e) = self.sender.send(src) {
+                if let Err(e) = self.sender.send(self.clients.clone()) {
+                    println!("Failed to send client list: {}", e);
+                }
+            }
+            else if received_message.trim() == "DISCONNECT" {
+                let clients_str: Vec<&str> = self.clients.split(',').filter(|&s| s != src.to_string()).collect();
+                self.clients = clients_str.join(",");
+
+                // Invia l'indirizzo del client al main tramite il canale
+                if let Err(e) = self.sender.send(self.clients.clone()) {
+                    println!("Failed to send client list: {}", e);
                 }
             }
         }
-    }
-
-    pub fn get_clients(&self) -> Arc<Mutex<HashMap<SocketAddr, String>>> {
-        Arc::clone(&self.clients)
     }
 }

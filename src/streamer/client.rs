@@ -3,7 +3,6 @@ use gst::{ClockTime, Pipeline, State};
 use std::{thread, fmt};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use gstreamer_rtsp_server::gio::ffi::g_action_print_detailed_name;
 
 pub struct StreamerClient {
     pipeline: Option<Pipeline>,
@@ -29,52 +28,29 @@ impl fmt::Display for ClientError {
 impl std::error::Error for ClientError {}
 
 impl StreamerClient {
-    pub fn new(ip_and_port: String) -> Result<Self, ClientError> {
+    pub fn new(port: i32) -> Result<Self, ClientError> {
         gst::init().unwrap();
 
-        // Stampa l'indirizzo e la porta ricevuti
-        println!("ip_and_port: {}", ip_and_port);
 
-        // Separazione dell'indirizzo IP e della porta
-        let parts: Vec<&str> = ip_and_port.split(':').collect();
-
-        if parts.len() != 2 {
-            return Err(ClientError { message: "Invalid IP and port format".to_string() });
-        }
-
-        let ip = parts[0];
-        let port: i32 = parts[1].parse().map_err(|_| ClientError { message: "Failed to parse port".to_string() })?;
-
-
+        println!("Port: {}", port);
 
         let pipeline = Pipeline::new();
 
         let udpsrc = gst::ElementFactory::make("udpsrc")
             .property("port", &port)
-            .property("address", &ip.to_string())
             .property("caps", &gst::Caps::new_empty_simple("application/x-rtp"))
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string() })?;
 
-        let queue1 = gst::ElementFactory::make("queue")
-            .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'queue1'".to_string() })?;
 
         let rtph264depay = gst::ElementFactory::make("rtph264depay")
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'rtph264depay'".to_string() })?;
 
-        let queue2 = gst::ElementFactory::make("queue")
-            .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'queue2'".to_string() })?;
 
         let ffdec_h264 = gst::ElementFactory::make("avdec_h264")
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'avdec_h264'".to_string() })?;
-
-        let queue3 = gst::ElementFactory::make("queue")
-            .build()
-            .map_err(|_| ClientError { message: "Failed to create element 'queue3'".to_string() })?;
 
         let videoconvert = gst::ElementFactory::make("videoconvert")
             .build()
@@ -86,27 +62,22 @@ impl StreamerClient {
 
         pipeline.add_many(&[
             &udpsrc,
-            &queue1,
             &rtph264depay,
-            &queue2,
             &ffdec_h264,
-            &queue3,
             &videoconvert,
             &autovideosink,
         ]).map_err(|_| ClientError { message: "Failed to add elements to pipeline".to_string() })?;
 
         gst::Element::link_many(&[
             &udpsrc,
-            &queue1,
             &rtph264depay,
-            &queue2,
             &ffdec_h264,
-            &queue3,
             &videoconvert,
             &autovideosink,
         ]).map_err(|_| ClientError { message: "Failed to link elements".to_string() })?;
 
-        pipeline.set_state(State::Ready).unwrap();
+
+        pipeline.set_state(State::Ready).expect("Unable to set the pipeline to the `Ready` state");
 
         let is_streaming = Arc::new(Mutex::new(false));
         Ok(Self {
