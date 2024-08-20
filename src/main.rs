@@ -7,12 +7,16 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 
 mod streamer;
 mod connection;
+use std::io;
+use std::net::SocketAddr;
 
 use streamer::streamer::ScreenStreamer;
 use streamer::client::StreamerClient;
 use connection::client::DiscoveryClient;
 use connection::server::DiscoveryServer;
 
+use std::net::{ Ipv4Addr};
+use socket2::{Socket, Domain, Type, Protocol,SockAddr};
 enum ControlMessage {
     Pause,
     Resume,
@@ -107,11 +111,15 @@ fn start_streamer() -> Result<(), Box<dyn Error>> {
 fn start_client() -> Result<(), Box<dyn Error>> {
     let discovery_client = DiscoveryClient::new()?;
     let (client_ip,client_port) = discovery_client.discover_server()?;
-    let client_port_clone = client_port.clone();
-    let mut player = StreamerClient::new(client_ip,client_port)?;
+    //let client_port_clone = client_port.clone();
+    
+
+   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
+    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
 
     player.start()?;
-    println!("Client started at port {}. Press Enter to stop...", client_port_clone);
+    println!("Client started at port {}. Press Enter to stop...", &client_port);
+
     let _ = std::io::stdin().read_line(&mut String::new());
     player.stop();
     discovery_client.notify_disconnection()?;

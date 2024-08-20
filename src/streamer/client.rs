@@ -4,6 +4,16 @@ use std::{thread, fmt};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+/* 
+fn is_port_available(ip: &str, port: i32) -> bool {
+
+    println!("sto controllando {ip}   e {port} ");
+   // UdpSocket::bind((ip, port as u16)).is_ok()
+   true
+}
+*/
+
+
 pub struct StreamerClient {
     pipeline: Option<Pipeline>,
     is_streaming: Arc<Mutex<bool>>,
@@ -30,6 +40,7 @@ impl std::error::Error for ClientError {}
 impl StreamerClient {
     pub fn new(ip: String, port: i32) -> Result<Self, ClientError> {
         gst::init().unwrap();
+        
 
 
         println!("IP:{} Port: {}", ip,port);
@@ -76,7 +87,6 @@ impl StreamerClient {
             &videoconvert,
             &autovideosink,
         ]).map_err(|_| ClientError { message: "Failed to link elements".to_string() })?;
-
 
         pipeline.set_state(State::Ready).expect("Unable to set the pipeline to the `Ready` state");
 
