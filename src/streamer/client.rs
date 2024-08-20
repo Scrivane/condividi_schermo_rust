@@ -54,13 +54,18 @@ impl StreamerClient {
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string() })?;
 
-
+        
+        let queue = gst::ElementFactory::make("queue").build()
+            .map_err(|_| ClientError {
+                message: "Failed to create queue".to_string(),
+            })?;
         let rtph264depay = gst::ElementFactory::make("rtph264depay")
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'rtph264depay'".to_string() })?;
 
 
         let ffdec_h264 = gst::ElementFactory::make("avdec_h264")
+        
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'avdec_h264'".to_string() })?;
 
@@ -69,11 +74,13 @@ impl StreamerClient {
             .map_err(|_| ClientError { message: "Failed to create element 'videoconvert'".to_string() })?;
 
         let autovideosink = gst::ElementFactory::make("autovideosink")
+            .property("sync", true)  //se vuoi evitarlo di vederlo accelerato se sono inndietro togliere
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'autovideosink'".to_string() })?;
 
         pipeline.add_many(&[
             &udpsrc,
+            &queue,
             &rtph264depay,
             &ffdec_h264,
             &videoconvert,
@@ -82,6 +89,7 @@ impl StreamerClient {
 
         gst::Element::link_many(&[
             &udpsrc,
+            &queue,
             &rtph264depay,
             &ffdec_h264,
             &videoconvert,
