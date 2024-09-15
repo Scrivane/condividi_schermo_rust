@@ -37,8 +37,10 @@ impl DiscoveryClient {
     pub fn discover_server(&self) -> Result<(String,i32), io::Error> {
         let broadcast_ip =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
-       // let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
+       
         let broadcast_addr = SocketAddrV4::new(broadcast_ip, 9000);
+        #[cfg(target_os = "linux")]
+        let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let sock_addr = SockAddr::from(broadcast_addr);
 
         let server_addr =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
@@ -96,6 +98,8 @@ impl DiscoveryClient {
 
         //let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let broadcast_addr = SocketAddrV4::new(server_addr, 9000);
+        #[cfg(target_os = "linux")]
+        let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let server_addr = SockAddr::from(broadcast_addr);
         self.socket.set_broadcast(true)?;
 
