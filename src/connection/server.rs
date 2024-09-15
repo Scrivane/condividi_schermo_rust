@@ -18,7 +18,7 @@ impl DiscoveryServer {
     pub fn run_discovery_listener(&mut self) -> Result<(), Box<dyn Error>> {
         let socket = UdpSocket::bind("0.0.0.0:9000")?;
 
-        println!("Discovery server is listening on port 9000");
+        println!("Discovery server is listening in {}",socket.local_addr().unwrap());
 
         loop {
             let mut buf = [0; 1024];
@@ -34,9 +34,8 @@ impl DiscoveryServer {
             println!("Received message: '{}' from {}", received_message, src);
 
             if received_message.trim() == "DISCOVERY" {
-                let server_ip = "127.0.0.1"; // IP del server di streaming
-                let server_port = 5000; // Porta del server di streaming
-                let response = format!("{}:{}", server_ip, server_port);
+
+                let response = format!("{}", socket.local_addr().unwrap());
 
                 if let Err(e) = socket.send_to(response.as_bytes(), &src) {
                     println!("Failed to send response: {}", e);

@@ -1,6 +1,6 @@
 use std::io::{self, ErrorKind};
 use socket2::{Socket, Domain, Type, Protocol, SockAddr};
-use std::net::{SocketAddr, Ipv4Addr,IpAddr};
+use std::net::{SocketAddr, Ipv4Addr, IpAddr, SocketAddrV4};
 use std::mem::MaybeUninit;
 pub struct DiscoveryClient{
     local_port: u16,
@@ -10,10 +10,6 @@ pub struct DiscoveryClient{
 impl DiscoveryClient {
     pub fn new() -> Result<Self, io::Error> {
         let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
-
-       
-        // Set the ReusePort option
-        socket.set_reuse_port(true)?;
 
         // Bind the socket to an address
         socket.bind(&SocketAddr::from(([0, 0, 0, 0], 0)).into())?;
@@ -37,10 +33,13 @@ impl DiscoveryClient {
     }
 
     pub fn discover_server(&self) -> Result<(String,i32), io::Error> {
+        let broadcast_ip =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
-        let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
+       // let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
+        let broadcast_addr = SocketAddrV4::new(broadcast_ip, 9000);
         let sock_addr = SockAddr::from(broadcast_addr);
-        //let server_addr = "255.255.255.255:9000"; // Broadcast al server di scoperta
+
+        let server_addr =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
         println!("Sending DISCOVERY message to {:?}", sock_addr);
 
@@ -67,7 +66,7 @@ impl DiscoveryClient {
 
                 println!("Received response: {} from {:?}", server_response, src);
                 let ipAddr: IpAddr = src.as_socket().expect("no as socket works").ip();
-                println!("the ip is {}",ipAddr.to_string());
+                println!("the IP is {}",ipAddr.to_string());
                 let ip = ipAddr.to_string().split(':').next().unwrap().to_string(); // Takes only the IP address
                 return Ok((ip, self.local_port as i32));
             }
@@ -84,17 +83,17 @@ impl DiscoveryClient {
 
         ris.is_err()
     } {}
- 
-    
 
     // If the loop exits without a successful result, return an error
     ris
     }
 
     pub fn notify_disconnection(&self) -> Result<(), io::Error> {
-        let server_addr = "255.255.255.255:9000"; // L'indirizzo del server
+        let server_addr =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
-        let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
+
+        //let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
+        let broadcast_addr = SocketAddrV4::new(server_addr, 9000);
         let server_addr = SockAddr::from(broadcast_addr);
         self.socket.set_broadcast(true)?;
 
