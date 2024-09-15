@@ -14,7 +14,6 @@ impl DiscoveryClient {
         // Bind the socket to an address
         socket.bind(&SocketAddr::from(([0, 0, 0, 0], 0)).into())?;
 
-        #[cfg(linux)]
         socket.set_reuse_address(true)?;
 
         //let local_addr = socket.local_addr()?;
@@ -44,7 +43,7 @@ impl DiscoveryClient {
 
         let server_addr =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
-        println!("Sending DISCOVERY message to {:?}", sock_addr);
+        println!("Sending DISCOVERY message to {:?}", server_addr);
 
         self.socket.set_broadcast(true)?;
 
@@ -67,7 +66,7 @@ impl DiscoveryClient {
             
                 let server_response = String::from_utf8_lossy(initialized_buf).to_string();
 
-                println!("Received response: {} from {:?}", server_response, src);
+                println!("Received response: {} from {:?}", server_response, src.as_socket_ipv4().unwrap().ip());
                 let ipAddr: IpAddr = src.as_socket().expect("no as socket works").ip();
                 println!("the IP is {}",ipAddr.to_string());
                 let ip = ipAddr.to_string().split(':').next().unwrap().to_string(); // Takes only the IP address
