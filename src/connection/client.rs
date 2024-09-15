@@ -13,6 +13,7 @@ impl DiscoveryClient {
 
        
         // Set the ReusePort option
+        #[cfg(target_os = "linux")]
         socket.set_reuse_port(true)?;
 
         // Bind the socket to an address
