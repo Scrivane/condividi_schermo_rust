@@ -14,6 +14,9 @@ impl DiscoveryClient {
         // Bind the socket to an address
         socket.bind(&SocketAddr::from(([0, 0, 0, 0], 0)).into())?;
 
+        #[cfg(linux)]
+        socket.set_reuse_address(true)?;
+
         //let local_addr = socket.local_addr()?;
         let local_addr = socket.local_addr()?;
         let mut local_port=0;
