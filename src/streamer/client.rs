@@ -44,7 +44,6 @@ impl StreamerClient {
 
         println!("IP:{} Port: {}", ip,port);
 
-
         let pipeline = Pipeline::new();
 
         let udpsrc = gst::ElementFactory::make("udpsrc")

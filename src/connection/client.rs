@@ -42,15 +42,10 @@ impl DiscoveryClient {
         let broadcast_addr = SocketAddrV4::new(broadcast_ip, 9000);
         #[cfg(target_os = "linux")]
         let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
-        
 
-        let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
-        
         let sock_addr = SockAddr::from(broadcast_addr);
 
-        let server_addr =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
-
-        println!("Sending DISCOVERY message to {:?}", server_addr);
+        println!("Sending DISCOVERY message to {:?}", broadcast_ip);
 
         self.socket.set_broadcast(true)?;
 
@@ -74,8 +69,8 @@ impl DiscoveryClient {
                 let server_response = String::from_utf8_lossy(initialized_buf).to_string();
 
                 println!("Received response: {} from {:?}", server_response, src.as_socket_ipv4().unwrap().ip());
-                let ipAddr: IpAddr = src.as_socket().expect("no as socket works").ip();
-                println!("the Server IP is {}",ipAddr.to_string());
+                let ip_addr: IpAddr = src.as_socket().expect("no as socket works").ip();
+                println!("the Server IP is {}",ip_addr.to_string());
                 let client_ip = server_response.trim().to_string();
                 return Ok((client_ip, self.local_port as i32));
             }
