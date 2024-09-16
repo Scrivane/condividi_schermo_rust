@@ -37,13 +37,22 @@ impl fmt::Display for ClientError {
 
 impl std::error::Error for ClientError {}
 
+
+use std::net::UdpSocket;
+
+fn is_port_available(ip: &str, port: i32) -> bool {
+    UdpSocket::bind((ip, port as u16)).is_ok()
+}
+
 impl StreamerClient {
     pub fn new(ip: String, port: i32) -> Result<Self, ClientError> {
         gst::init().unwrap();
-        
-
 
         println!("IP:{} Port: {}", ip,port);
+
+        if !is_port_available(&ip, port) {
+            return Err(ClientError { message: format!("Port {} is not available", port) });
+        }
 
         let pipeline = Pipeline::new();
 
@@ -54,7 +63,7 @@ impl StreamerClient {
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'udpsrc'".to_string() })?;
 
-        
+
         let queue = gst::ElementFactory::make("queue").build()
             .map_err(|_| ClientError {
                 message: "Failed to create queue".to_string(),
@@ -65,7 +74,7 @@ impl StreamerClient {
 
 
         let ffdec_h264 = gst::ElementFactory::make("avdec_h264")
-        
+
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'avdec_h264'".to_string() })?;
 

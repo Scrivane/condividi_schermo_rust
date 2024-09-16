@@ -11,10 +11,12 @@ impl DiscoveryClient {
     pub fn new() -> Result<Self, io::Error> {
         let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
+        socket.set_reuse_address(true)?;
+
         // Bind the socket to an address
         socket.bind(&SocketAddr::from(([0, 0, 0, 0], 0)).into())?;
 
-        socket.set_reuse_address(true)?;
+
 
         //let local_addr = socket.local_addr()?;
         let local_addr = socket.local_addr()?;
@@ -37,7 +39,7 @@ impl DiscoveryClient {
     pub fn discover_server(&self) -> Result<(String,i32), io::Error> {
         let broadcast_ip =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
-       // let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
+        //let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let broadcast_addr = SocketAddrV4::new(broadcast_ip, 9000);
         let sock_addr = SockAddr::from(broadcast_addr);
 

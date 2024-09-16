@@ -356,7 +356,6 @@ impl ScreenStreamer {
                 .expect("Multiudpsink element not found");
 
 
-
             let clients = self.clients.lock().unwrap();
             let addresses: Vec<String> = clients.iter().map(|addr| addr.to_string()).collect();
             let addresses_str = addresses.join(",");
