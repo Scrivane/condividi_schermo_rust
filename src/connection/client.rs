@@ -98,6 +98,8 @@ impl DiscoveryClient {
 
         //let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let broadcast_addr = SocketAddrV4::new(server_addr, 9000);
+        #[cfg(target_os = "linux")]
+        let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let server_addr = SockAddr::from(broadcast_addr);
         self.socket.set_broadcast(true)?;
 
