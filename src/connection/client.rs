@@ -17,7 +17,6 @@ impl DiscoveryClient {
         socket.bind(&SocketAddr::from(([0, 0, 0, 0], 0)).into())?;
 
 
-
         //let local_addr = socket.local_addr()?;
         let local_addr = socket.local_addr()?;
         let mut local_port=0;
@@ -70,9 +69,9 @@ impl DiscoveryClient {
 
                 println!("Received response: {} from {:?}", server_response, src.as_socket_ipv4().unwrap().ip());
                 let ipAddr: IpAddr = src.as_socket().expect("no as socket works").ip();
-                println!("the IP is {}",ipAddr.to_string());
-                let ip = ipAddr.to_string().split(':').next().unwrap().to_string(); // Takes only the IP address
-                return Ok((ip, self.local_port as i32));
+                println!("the Server IP is {}",ipAddr.to_string());
+                let client_ip = server_response.trim().to_string();
+                return Ok((client_ip, self.local_port as i32));
             }
             Err(e) => {
                 if !matches!(e.kind(), ErrorKind::WouldBlock) {

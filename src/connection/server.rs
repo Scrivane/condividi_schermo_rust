@@ -34,8 +34,8 @@ impl DiscoveryServer {
             println!("Received message: '{}' from {}", received_message, src);
 
             if received_message.trim() == "DISCOVERY" {
-
-                let response = format!("{}", socket.local_addr().unwrap());
+                //risponde al client dandogli l'indirizzo ip che verrà assegnato nel multiudp
+                let response = format!("{}", src.ip().to_string());
 
                 if let Err(e) = socket.send_to(response.as_bytes(), &src) {
                     println!("Failed to send response: {}", e);
