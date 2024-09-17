@@ -4,19 +4,19 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use display_info::DisplayInfo;
 
 mod streamer;
 mod connection;
-use std::io;
-use std::net::SocketAddr;
+
 
 use streamer::streamer::ScreenStreamer;
 use streamer::client::StreamerClient;
 use connection::client::DiscoveryClient;
 use connection::server::DiscoveryServer;
 
-use std::net::{ Ipv4Addr};
-use socket2::{Socket, Domain, Type, Protocol,SockAddr};
+
+
 enum ControlMessage {
     Pause,
     Resume,
@@ -47,10 +47,13 @@ fn handle_event(sender: mpsc::Sender<ControlMessage>) -> Result<(), Box<dyn Erro
 }
 
 fn start_streamer() -> Result<(), Box<dyn Error>> {
+
+    let num_monitor = select_monitor();
+
     let (control_sender, control_receiver) = mpsc::channel();
     let (client_sender, client_receiver) = mpsc::channel();
 
-    let streamer = ScreenStreamer::new()?;
+    let streamer = ScreenStreamer::new(num_monitor)?;
     let streamer_arc = Arc::new(Mutex::new(streamer));
 
     let mut discovery_server = DiscoveryServer::new(client_sender);
@@ -125,6 +128,37 @@ fn start_client() -> Result<(), Box<dyn Error>> {
     discovery_client.notify_disconnection()?;
 
     Ok(())
+}
+
+
+fn select_monitor() -> usize {
+    // Inizializza la finestra UI lampo
+    let display_infos = DisplayInfo::all().unwrap();
+    let mut monitor_ids = Vec::new();
+    let mut id = 0;
+
+    for display_info in display_infos {
+        println!("Name : {}, number {}", display_info.name, id);
+        monitor_ids.push(id);
+        id += 1;
+    }
+
+    let mut selected_monitor: usize = 0;
+    loop {
+        println!("Select the monitor to stream (0, 1, 2, ...): ");
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).expect("Failed to read line");
+        match input.trim().parse() {
+            Ok(num) if num < monitor_ids.len() => {
+                selected_monitor = num;
+                break;
+            }
+            _ => {
+                println!("Invalid input. Please enter a valid monitor number.");
+            }
+        }
+    }
+    selected_monitor
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

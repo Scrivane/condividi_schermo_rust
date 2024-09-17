@@ -30,7 +30,7 @@ pub struct ScreenStreamer {
 }
 
 impl ScreenStreamer {
-    pub fn new() -> Result<Self, ServerError> {
+    pub fn new(monitor_id: usize) -> Result<Self, ServerError> {
         gst::init().map_err(|e| ServerError {
             message: format!("Failed to initialize GStreamer: {}", e),
         })?;
@@ -43,7 +43,7 @@ impl ScreenStreamer {
         };
 
         #[cfg(target_os = "windows")]
-        let pipeline = Self::create_pipeline_windows(capture_region)?;
+        let pipeline = Self::create_pipeline_windows(capture_region, monitor_id)?;
 
         #[cfg(target_os = "linux")]
         let pipeline = Self::create_pipeline_linux_wayland()?;
@@ -82,10 +82,11 @@ impl ScreenStreamer {
     }
 
     #[cfg(target_os = "windows")]
-    fn create_pipeline_windows(capture_region: DimensionToCrop) -> Result<Pipeline, ServerError> {
+    fn create_pipeline_windows(capture_region: DimensionToCrop, monitor_id: usize) -> Result<Pipeline, ServerError> {
+
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
             .property("show-cursor", true)
-            .property("monitor-index", &0)
+            .property("monitor-index", &(monitor_id as i32))
             .property("show-border", true)
             .build()
             .map_err(|_| ServerError {
@@ -311,6 +312,8 @@ impl ScreenStreamer {
 
         Ok(pipeline)
     }
+
+
 
     pub fn add_client(&mut self, client_addr: String) {
         {
