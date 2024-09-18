@@ -48,6 +48,11 @@ impl ScreenStreamer {
         #[cfg(target_os = "linux")]
         let pipeline = Self::create_pipeline_linux_wayland()?;
 
+
+        #[cfg(target_os = "macos")]
+        let pipeline = Self::create_pipeline_macos(capture_region)?;
+
+
         let bus = pipeline.bus().unwrap();
         let pipeline_clone = pipeline.clone();
         std::thread::spawn(move || {
@@ -156,6 +161,18 @@ impl ScreenStreamer {
         })
     }
 
+    #[cfg(target_os = "macos")]
+    fn create_pipeline_macos(capture_region: DimensionToCrop) -> Result<Pipeline, ServerError> {
+        let videosrc = gst::ElementFactory::make("avfvideosrc")
+            .property("capture-screen", true)
+            .property("device-index", &0)
+            .build()
+            .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
+
+        // Successivamente, passa la sorgente video alla funzione comune per creare il resto della pipeline
+        Self::create_common_pipeline(videosrc, capture_region)
+    }
+    
     fn create_common_pipeline(videosrc: gst::Element, crop: DimensionToCrop) -> Result<Pipeline, ServerError> {
         let videocrop = gst::ElementFactory::make("videocrop")
             .property("bottom", &crop.bottom)

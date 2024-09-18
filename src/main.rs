@@ -15,6 +15,12 @@ use streamer::client::StreamerClient;
 use connection::client::DiscoveryClient;
 use connection::server::DiscoveryServer;
 
+#[cfg(target_os = "macos")]
+#[link(name = "foundation", kind = "framework")]
+extern "C" {
+    fn CFRunLoopRun();
+}
+
 
 
 enum ControlMessage {
@@ -172,4 +178,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         "client" => start_client(),
         _ => Err("Invalid mode. Use 'streamer' or 'client'".into()),
     }
+    
+}
+
+/// macOS ha bisogno di un run loop per aprire finestre e utilizzare OpenGL.
+#[cfg(target_os = "macos")]
+pub fn run<F: FnOnce() + Send + 'static>(main: F) {
+    std::thread::spawn(main);
+    unsafe {
+        CFRunLoopRun();
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn run<F: FnOnce() + Send + 'static>(main: F) {
+    main();
 }

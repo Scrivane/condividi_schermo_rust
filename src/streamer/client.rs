@@ -3,6 +3,8 @@ use gst::{ClockTime, Pipeline, State};
 use std::{thread, fmt};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use objc::{class, msg_send, sel, sel_impl};
+
 
 /* 
 fn is_port_available(ip: &str, port: i32) -> bool {
@@ -12,6 +14,15 @@ fn is_port_available(ip: &str, port: i32) -> bool {
    true
 }
 */
+
+#[cfg(target_os = "macos")]
+fn initialize_macos_app() {
+    unsafe {
+        // Inizializza l'applicazione macOS
+        let _: () = msg_send![class!(NSApplication), sharedApplication];
+        
+    }
+}
 
 
 pub struct StreamerClient {
@@ -41,6 +52,12 @@ impl std::error::Error for ClientError {}
 impl StreamerClient {
     pub fn new(ip: String, port: i32) -> Result<Self, ClientError> {
         gst::init().unwrap();
+
+        //obbligatorio per macos, obbliga a riprodurre sul thread principale
+        #[cfg(target_os = "macos")]
+        {
+            initialize_macos_app();
+        }
 
         println!("IP:{} Port: {}", ip,port);
 
