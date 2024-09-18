@@ -22,7 +22,6 @@ extern "C" {
 }
 
 
-
 enum ControlMessage {
     Pause,
     Resume,
@@ -80,6 +79,7 @@ fn start_streamer() -> Result<(), Box<dyn Error>> {
                     streamer.stop();
                     break;
                 }
+
             }
         }
     });
@@ -126,11 +126,14 @@ fn start_client() -> Result<(), Box<dyn Error>> {
    // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
     let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
 
-    player.start()?;
+    player.start_streaming()?;
     println!("Client started at port {}. Press Enter to stop...", &client_port);
+    //player.start_recording()?;
 
     let _ = std::io::stdin().read_line(&mut String::new());
-    player.stop();
+
+    //player.stop_recording()?;
+    player.stop_streaming();
     discovery_client.notify_disconnection()?;
 
     Ok(())
@@ -149,7 +152,7 @@ fn select_monitor() -> usize {
         id += 1;
     }
 
-    let mut selected_monitor: usize = 0;
+    let mut selected_monitor = 0;
     loop {
         println!("Select the monitor to stream (0, 1, 2, ...): ");
         let mut input = String::new();

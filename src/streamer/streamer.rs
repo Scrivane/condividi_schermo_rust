@@ -389,8 +389,6 @@ impl ScreenStreamer {
     }
 
 
-
-
     pub fn start(&mut self) -> Result<(), String> {
         let pipeline = self.pipeline.as_ref().ok_or_else(|| "Pipeline is not initialized".to_string())?;
         pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline to Playing".to_string())?;
