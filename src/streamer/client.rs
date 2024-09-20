@@ -20,7 +20,6 @@ fn initialize_macos_app() {
     unsafe {
         // Inizializza l'applicazione macOS
         let _: () = msg_send![class!(NSApplication), sharedApplication];
-        
     }
 }
 
@@ -81,7 +80,6 @@ impl StreamerClient {
 
 
         let ffdec_h264 = gst::ElementFactory::make("avdec_h264")
-
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'avdec_h264'".to_string() })?;
 
@@ -90,7 +88,7 @@ impl StreamerClient {
             .map_err(|_| ClientError { message: "Failed to create element 'videoconvert'".to_string() })?;
 
         let autovideosink = gst::ElementFactory::make("autovideosink")
-            .property("sync", true)  //se vuoi evitarlo di vederlo accelerato se sono inndietro togliere
+           // .property("sync", true)  //se vuoi evitarlo di vederlo accelerato se sono inndietro togliere
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'autovideosink'".to_string() })?;
 

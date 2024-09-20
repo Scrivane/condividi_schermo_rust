@@ -59,7 +59,7 @@ fn start_streamer() -> Result<(), Box<dyn Error>> {
     let (control_sender, control_receiver) = mpsc::channel();
     let (client_sender, client_receiver) = mpsc::channel();
 
-    let streamer = ScreenStreamer::new(num_monitor)?;
+    let streamer = ScreenStreamer::new(0)?;
     let streamer_arc = Arc::new(Mutex::new(streamer));
 
     let mut discovery_server = DiscoveryServer::new(client_sender);
@@ -95,17 +95,29 @@ fn start_streamer() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Avvia lo streamer e gestisce gli eventi della tastiera
+    //CAMBIATA GESTIONE ERRORI PER AVVIO STREAMING
     {
         let mut streamer = streamer_arc.lock().unwrap();
-        streamer.start()?;
-        println!(
-            "Streamer started\n\
-            Press CTRL+C to stop the server\n\
-            Press CTRL+P to pause the stream\n\
-            Press CTRL+R to resume the stream"
-        );
+    
+        // Prova ad avviare lo streaming e verifica se ci sono stati errori
+        match streamer.start() {
+            Ok(_) => {
+                // Se lo streaming è stato avviato con successo
+                println!(
+                    "Streamer started successfully\n\
+                    Press CTRL+C to stop the server\n\
+                    Press CTRL+P to pause the stream\n\
+                    Press CTRL+R to resume the stream"
+                );
+            },
+            Err(e) => {
+                // Se c'è stato un errore durante l'avvio dello streaming
+                eprintln!("Failed to start streamer: {:?}", e);
+                return Err(e.into());
+            }
+        }
     }
+    
 
     handle_event(control_sender)?;
 
@@ -120,7 +132,7 @@ fn start_streamer() -> Result<(), Box<dyn Error>> {
 fn start_client() -> Result<(), Box<dyn Error>> {
     let discovery_client = DiscoveryClient::new()?;
     let (client_ip,client_port) = discovery_client.discover_server()?;
-    //let client_port_clone = client_port.clone();
+    let client_port_clone = client_port.clone();
     
 
    // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
@@ -167,7 +179,7 @@ fn select_monitor() -> usize {
     selected_monitor
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main_logic() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         return Err("Usage: <program> [streamer|client]".into());
@@ -181,10 +193,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     
 }
 
+fn main() -> Result<(), Box<dyn Error>> {
+    // Su macOS, run() gestisce l'avvio e il loop
+    // Su altri sistemi operativi, chiama semplicemente main_logic
+    run(|| {
+        if let Err(e) = main_logic() {
+            eprintln!("Error: {}", e);
+        }
+    });
+
+    Ok(())
+}
+
 /// macOS ha bisogno di un run loop per aprire finestre e utilizzare OpenGL.
 #[cfg(target_os = "macos")]
 pub fn run<F: FnOnce() + Send + 'static>(main: F) {
     std::thread::spawn(main);
+
     unsafe {
         CFRunLoopRun();
     }

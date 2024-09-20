@@ -4,6 +4,12 @@ use gst::{Pipeline, State};
 use cfg_if::cfg_if;
 use crate::streamer::error::ServerError;
 
+
+//inclusioni necessarie solo per macos
+#[cfg(target_os = "macos")]
+use objc::{class, msg_send, sel, sel_impl};
+
+
 #[cfg(target_os = "linux")]
 use ashpd::{
     desktop::{
@@ -30,16 +36,17 @@ pub struct ScreenStreamer {
 }
 
 impl ScreenStreamer {
+
     pub fn new(monitor_id: usize) -> Result<Self, ServerError> {
         gst::init().map_err(|e| ServerError {
             message: format!("Failed to initialize GStreamer: {}", e),
         })?;
 
         let capture_region = DimensionToCrop {
-            top: 300,
-            bottom: 300,
-            right: 300,
-            left: 300,
+            top: 400,
+            bottom: 400,
+            right: 400,
+            left: 400,
         };
 
         #[cfg(target_os = "windows")]
@@ -169,10 +176,11 @@ impl ScreenStreamer {
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
+            
         // Successivamente, passa la sorgente video alla funzione comune per creare il resto della pipeline
         Self::create_common_pipeline(videosrc, capture_region)
     }
-    
+
     fn create_common_pipeline(videosrc: gst::Element, crop: DimensionToCrop) -> Result<Pipeline, ServerError> {
         let videocrop = gst::ElementFactory::make("videocrop")
             .property("bottom", &crop.bottom)
@@ -208,16 +216,20 @@ impl ScreenStreamer {
             }
         }
 
+        //
+        //CREO IL CAPS FILTER IN DUE PASSAGGI PERCHE MI DAVA PROBLEMI
+        //
+        let caps = gst::Caps::builder("video/x-raw")
+            .build();
+
+
         let capsfilter = gst::ElementFactory::make("capsfilter")
-            .property(
-                "caps",
-                gst::Caps::builder("video/x-raw")
-                    .field("framerate", &gst::Fraction::new(30, 1))
-                    .build(),
-            ).build()
+            .property("caps", &caps)  
+            .build()
             .map_err(|_| ServerError {
                 message: "Failed to create capsfilter".to_string(),
             })?;
+
 
         let queue1 = gst::ElementFactory::make("queue").build()
             .map_err(|_| ServerError {
@@ -234,7 +246,8 @@ impl ScreenStreamer {
                 message: "Failed to create queue2".to_string(),
             })?;
 
-        let x264enc = gst::ElementFactory::make("x264enc").build()
+        let x264enc = gst::ElementFactory::make("x264enc")
+        .build()
             .map_err(|_| ServerError {
                 message: "Failed to create x264enc".to_string(),
             })?;
@@ -262,10 +275,8 @@ impl ScreenStreamer {
                 message: "Failed to create multiudpsink".to_string(),
             })?;
 
+
         let pipeline = Pipeline::new();
-        pipeline.add(&videosrc).map_err(|_| ServerError {
-            message: "Failed to add videosrc to pipeline".to_string(),
-        })?;
 
         cfg_if! {
             if #[cfg(target_os = "linux")] {
@@ -279,7 +290,11 @@ impl ScreenStreamer {
             }
         }
 
+        //
+        //IL VIDEOSRC ADESSO LO AGGIUNGO DIRETTAMENTE QUI
+        //
         pipeline.add_many(&[
+            &videosrc,
             &capsfilter,
             &videocrop,
             &queue1,
@@ -289,13 +304,18 @@ impl ScreenStreamer {
             &queue3,
             &rtph264pay,
             &queue4,
-            &udpmulticastsink,
+            &udpmulticastsink
         ]).map_err(|_| ServerError {
             message: "Failed to add elements to pipeline".to_string(),
         })?;
 
-        cfg_if! {
-            if #[cfg(target_os = "linux")] {
+        //
+        //SARA DA CAMBIARE PER LINUX PENSO VISTO CHE AGGIUNGO VIDEOSRC PRIMA
+        //HO RIMOSSO L'ELSE POICHE LO AGGIUNGO DIRETTAMENTE DOPO
+        //
+        
+        
+             #[cfg(target_os = "linux")] {
                 gst::Element::link_many(&[
                     &videosrc,
                     &videoscale,
@@ -305,26 +325,25 @@ impl ScreenStreamer {
                 ]).map_err(|_| ServerError {
                     message: "Failed to link elements".to_string(),
                 })?;
-            } else {
-                gst::Element::link(&videosrc, &capsfilter).map_err(|_| ServerError {
-                    message: "Failed to link elements".to_string(),
-                })?;
             }
-        }
+            
+        
+
 
         gst::Element::link_many(&[
+            &videosrc,
             &capsfilter,
             &videocrop,
-            &queue1,
             &videoconvert,
+            &queue1,
             &queue2,
             &x264enc,
             &queue3,
             &rtph264pay,
             &queue4,
-            &udpmulticastsink,
-        ]).map_err(|_| ServerError {
-            message: "Failed to link elements".to_string(),
+            &udpmulticastsink
+        ]).map_err(|err| ServerError {
+            message: format!("Failed to link elements: {:?}", err),  // Inserisce l'errore dettagliato nel messaggio
         })?;
 
         Ok(pipeline)
@@ -389,14 +408,35 @@ impl ScreenStreamer {
     }
 
 
-
-
+//
+//CAMBIATO GESTIONE DELLO START
+//
     pub fn start(&mut self) -> Result<(), String> {
-        let pipeline = self.pipeline.as_ref().ok_or_else(|| "Pipeline is not initialized".to_string())?;
-        pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline to Playing".to_string())?;
-        self.is_streaming = true;
 
-        Ok(())
+        //macos richiede che ogni applicazione grafica venga runnata sul main thread, queste righe di codice 
+        //permettono di forzare il programma a fare ciò
+        #[cfg(target_os = "macos")]
+        unsafe {
+            let _: () = msg_send![class!(NSApplication), sharedApplication];
+        }
+
+
+        let pipeline = self.pipeline.as_ref().ok_or_else(|| "Pipeline is not initialized".to_string())?;
+    
+        // Verifica lo stato corrente della pipeline, se è già su Playing ritorno un errore
+        let (_, current_state, _) = pipeline.state(Some(gst::ClockTime::from_mseconds(100)));
+
+        // Verifica se la pipeline è già in esecuzione
+        if current_state == gst::State::Playing {
+            return Err("Pipeline is already playing".to_string());
+        }
+        
+            // Imposta la pipeline su Playing
+            pipeline.set_state(State::Playing).map_err(|err| format!("Failed to set pipeline to Playing: {:?}", err))?;
+            self.is_streaming = true;
+
+        
+            Ok(())
     }
 
     pub fn stop(&mut self) {
