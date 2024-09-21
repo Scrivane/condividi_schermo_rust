@@ -314,8 +314,13 @@ impl ScreenStreamer {
         //HO RIMOSSO L'ELSE POICHE LO AGGIUNGO DIRETTAMENTE DOPO
         //
         
-        
-             #[cfg(target_os = "linux")] {
+
+
+
+
+
+        cfg_if! {
+            if #[cfg(target_os = "linux")] {
                 gst::Element::link_many(&[
                     &videosrc,
                     &videoscale,
@@ -325,13 +330,14 @@ impl ScreenStreamer {
                 ]).map_err(|_| ServerError {
                     message: "Failed to link elements".to_string(),
                 })?;
+            } else {
+                gst::Element::link(&videosrc, &capsfilter).map_err(|_| ServerError {
+                    message: "Failed to link elements".to_string(),
+                })?;
             }
-            
-        
-
+        }
 
         gst::Element::link_many(&[
-            &videosrc,
             &capsfilter,
             &videocrop,
             &videoconvert,
@@ -342,9 +348,12 @@ impl ScreenStreamer {
             &rtph264pay,
             &queue4,
             &udpmulticastsink
-        ]).map_err(|err| ServerError {
-            message: format!("Failed to link elements: {:?}", err),  // Inserisce l'errore dettagliato nel messaggio
+        ]).map_err(|_| ServerError {
+            message: "Failed to link elements".to_string(),
         })?;
+
+
+
 
         Ok(pipeline)
     }

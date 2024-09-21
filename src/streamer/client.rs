@@ -3,6 +3,7 @@ use gst::{ClockTime, Pipeline, State};
 use std::{thread, fmt};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+#[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
 
 
