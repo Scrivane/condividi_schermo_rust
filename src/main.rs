@@ -17,6 +17,62 @@ use connection::client::DiscoveryClient;
 use connection::server::DiscoveryServer;
 
 
+//ROBA PER GUI
+use iced::widget::{Button, Column, Text};
+use iced::{Element, Sandbox, Settings};
+
+#[derive(Default)]
+struct MyApp;
+
+#[derive(Debug, Clone, Copy)]
+enum Message {
+    StreamerPressed,
+    ClientPressed,
+}
+
+impl Sandbox for MyApp {
+    type Message = Message;
+
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn title(&self) -> String {
+        String::from("Ice GUI Example")
+    }
+
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::StreamerPressed => {
+                println!("Streamer button pressed!");
+                start_streamer();
+            }
+            Message::ClientPressed => {
+                println!("Client button pressed!");
+                start_client();
+            }
+        }
+    }
+
+    fn view(&self) -> Element<Message> {
+        let text = Text::new("Select an option:");
+
+        let streamer_button = Button::new(Text::new("Run Streamer"))
+            .on_press(Message::StreamerPressed);
+
+        let client_button = Button::new(Text::new("Run Client"))
+            .on_press(Message::ClientPressed);
+
+        // Imposta la colonna con il testo e i bottoni
+        Column::new()
+            .push(text)
+            .push(streamer_button)
+            .push(client_button)
+            .into()
+    }
+}
+
+
 #[cfg(target_os = "macos")]
 #[link(name = "foundation", kind = "framework")]
 extern "C" {
@@ -183,29 +239,12 @@ fn select_monitor() -> usize {
     selected_monitor
 }
 
-fn main_logic() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        return Err("Usage: <program> [streamer|client]".into());
-    }
-
-    match args[1].as_str() {
-        "streamer" => start_streamer(),
-        "client" => start_client(),
-        _ => Err("Invalid mode. Use 'streamer' or 'client'".into()),
-    }
-    
+fn main_logic() {
+    MyApp::run(Settings::default());  
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Su macOS, run() gestisce l'avvio e il loop
-    // Su altri sistemi operativi, chiama semplicemente main_logic
-    run(|| {
-        if let Err(e) = main_logic() {
-            eprintln!("Error: {}", e);
-        }
-    });
-
+    MyApp::run(Settings::default());
     Ok(())
 }
 
