@@ -173,33 +173,6 @@ impl ScreenStreamer {
             message: "Failed to create videocrop".to_string(),
         })?;
         
-        //Framerate specifico per linux
-
-        cfg_if! {
-            if #[cfg(target_os = "linux")] {
-        
-                let videoscale = gst::ElementFactory::make("videoscale").build()
-                    .map_err(|_| ServerError {
-                        message: "Failed to create videoscale".to_string(),
-                    })?;
-
-                let capsfilterdim = gst::ElementFactory::make("capsfilter")
-                    .property(
-                        "caps",
-                        gst::Caps::builder("video/x-raw")
-                            .field("width", 1280).field("height", 720)
-                            .build(),
-                    ).build().map_err(|_| ServerError {
-                        message: "Failed to create capsfilterdim".to_string(),
-                    })?;
-
-                let videoRate = gst::ElementFactory::make("videorate").build()
-                    .map_err(|_| ServerError {
-                        message: "Failed to create videoRate".to_string(),
-                    })?;
-                    
-            }
-        }
 
         //Creazione elementi della pipeline comuni
         let caps = gst::Caps::builder("video/x-raw")
@@ -259,19 +232,6 @@ impl ScreenStreamer {
             })?;
         
             let pipeline = Pipeline::new();
-
-            //linux nel caso specifico ha una pipeline più lunga
-            cfg_if! {
-                if #[cfg(target_os = "linux")] {
-                    pipeline.add_many(&[
-                        &videoscale,
-                        &capsfilterdim,
-                        &videoRate,
-                    ]).map_err(|_| ServerError {
-                        message: "Failed to add elements to pipeline for linux".to_string(),
-                    })?;
-                }
-            }
         
             pipeline.add_many(&[
                 &videosrc,
@@ -287,28 +247,7 @@ impl ScreenStreamer {
             ]).map_err(|_| ServerError {
                 message: "Failed to add elements to pipeline".to_string(),
             })?;
-
-            //Link degli elementi specifici per linux
-            cfg_if! {
-                if #[cfg(target_os = "linux")] {
-                gst::Element::link_many(&[
-                    &videosrc,
-                    &videoscale,
-                    &capsfilterdim,
-                    &videoRate,
-                    &capsfilter,
-                    &videocrop,
-                    &videoconvert,
-                    &queue1,
-                    &x264enc,
-                    &queue2,
-                    &rtph264pay,
-                    &queue3,
-                    &udpmulticastsink
-                ]).map_err(|_| ServerError {
-                    message: "Failed to link elements".to_string(),
-                })?;
-            }else {
+                
                 gst::Element::link_many(&[
                     &videosrc,
                     &capsfilter,
@@ -323,8 +262,7 @@ impl ScreenStreamer {
                 ]).map_err(|err| ServerError {
                     message: format!("Failed to link elements: {:?}", err),  // Inserisce l'errore dettagliato nel messaggio
                 })?;
-            }
-        }
+        
             
         Ok(pipeline)
 
