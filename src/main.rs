@@ -12,8 +12,10 @@ mod connection;
 
 use streamer::streamer::ScreenStreamer;
 use streamer::client::StreamerClient;
+use streamer::streamer::DimensionToCrop;
 use connection::client::DiscoveryClient;
 use connection::server::DiscoveryServer;
+
 
 #[cfg(target_os = "macos")]
 #[link(name = "foundation", kind = "framework")]
@@ -55,11 +57,13 @@ fn handle_event(sender: mpsc::Sender<ControlMessage>) -> Result<(), Box<dyn Erro
 fn start_streamer() -> Result<(), Box<dyn Error>> {
 
     let num_monitor = select_monitor();
+    let Crop = DimensionToCrop::new(400,400,400,400);
+
 
     let (control_sender, control_receiver) = mpsc::channel();
     let (client_sender, client_receiver) = mpsc::channel();
 
-    let streamer = ScreenStreamer::new(0)?;
+    let streamer = ScreenStreamer::new(Crop, 0)?;
     let streamer_arc = Arc::new(Mutex::new(streamer));
 
     let mut discovery_server = DiscoveryServer::new(client_sender);
