@@ -139,27 +139,29 @@ impl ScreenStreamer {
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
-        #[cfg(target_os = "linux")]{
-            let rt = Runtime::new().map_err(|e| ServerError {
-                message: format!("Failed to create Tokio runtime: {}", e),
-            })?;
-    
-            let valnod = match rt.block_on(Self::run()) {
-                Ok(value) => value,
-                Err(e) => {
-                    return Err(ServerError {
-                        message: format!("Failed to run async screencast session: {}", e),
-                    })
-                }
-            };
-    
-            let videosrc = gst::ElementFactory::make("pipewiresrc")
-                .property("path", valnod.to_string())
-                .build()
-                .map_err(|_| ServerError {
-                    message: "Failed to create pipewiresrc".to_string(),
+        cfg_if! {
+            if #[cfg(target_os = "linux")] {
+                let rt = Runtime::new().map_err(|e| ServerError {
+                    message: format!("Failed to create Tokio runtime: {}", e),
                 })?;
+        
+                let valnod = match rt.block_on(Self::run()) {
+                    Ok(value) => value,
+                    Err(e) => {
+                        return Err(ServerError {
+                            message: format!("Failed to run async screencast session: {}", e),
+                        })
+                    }
+                };
+        
+                let videosrc = gst::ElementFactory::make("pipewiresrc")
+                    .property("path", valnod.to_string())
+                    .build()
+                    .map_err(|_| ServerError {
+                        message: "Failed to create pipewiresrc".to_string(),
+                    })?;
         }
+    }
 
         let videocrop = gst::ElementFactory::make("videocrop")
         .property("bottom", &crop.bottom)
@@ -172,7 +174,10 @@ impl ScreenStreamer {
         })?;
         
         //Framerate specifico per linux
-        #[cfg(target_os = "linux")] {
+
+        cfg_if! {
+            if #[cfg(target_os = "linux")] {
+        
                 let videoscale = gst::ElementFactory::make("videoscale").build()
                     .map_err(|_| ServerError {
                         message: "Failed to create videoscale".to_string(),
@@ -192,7 +197,9 @@ impl ScreenStreamer {
                     .map_err(|_| ServerError {
                         message: "Failed to create videoRate".to_string(),
                     })?;
+                    
             }
+        }
 
         //Creazione elementi della pipeline comuni
         let caps = gst::Caps::builder("video/x-raw")
