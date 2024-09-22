@@ -42,15 +42,7 @@ impl ScreenStreamer {
             left: 300,
         };
 
-        #[cfg(target_os = "windows")]
-        let pipeline = Self::create_pipeline_windows(capture_region, monitor_id)?;
-
-        #[cfg(target_os = "linux")]
-        let pipeline = Self::create_pipeline_linux_wayland()?;
-
-
-        #[cfg(target_os = "macos")]
-        let pipeline = Self::create_pipeline_macos(capture_region)?;
+        let pipeline = Self::create_pipeline(capture_region, monitor_id)?;
 
 
         let bus = pipeline.bus().unwrap();
@@ -86,94 +78,55 @@ impl ScreenStreamer {
         })
     }
 
-    #[cfg(target_os = "windows")]
-    fn create_pipeline_windows(capture_region: DimensionToCrop, monitor_id: usize) -> Result<Pipeline, ServerError> {
 
+    
+    fn create_pipeline(crop: DimensionToCrop, device_index: usize) -> Result<Pipeline, ServerError> {
+
+        //Creazione dei videosource specializzate per ogni OS
+        #[cfg(target_os = "windows")]
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
             .property("show-cursor", true)
-            .property("monitor-index", &(monitor_id as i32))
+            .property("monitor-index", &(device_index as i32))
             .property("show-border", true)
             .build()
             .map_err(|_| ServerError {
                 message: "Failed to create d3d11screencapturesrc".to_string(),
             })?;
 
-        Self::create_common_pipeline(videosrc, capture_region)
-    }
-
-    #[cfg(target_os = "linux")]
-    async fn run() -> ashpd::Result<u32> {
-        let proxy = Screencast::new().await?;
-        let mut valnode: u32 = 0;
-
-        let session = proxy.create_session().await?;
-        proxy
-            .select_sources(
-                &session,
-                CursorMode::Metadata,
-                SourceType::Monitor | SourceType::Window,
-                true,
-                None,
-                PersistMode::DoNot,
-            )
-            .await?;
-
-        let response = proxy
-            .start(&session, &WindowIdentifier::default())
-            .await?
-            .response()?;
-        response.streams().iter().for_each(|stream| {
-            println!("node id: {}", stream.pipe_wire_node_id());
-            println!("size: {:?}", stream.size());
-            println!("position: {:?}", stream.position());
-            valnode = stream.pipe_wire_node_id();
-        });
-        Ok(valnode)
-    }
-
-    #[cfg(target_os = "linux")]
-    fn create_pipeline_linux_wayland() -> Result<Pipeline, ServerError> {
-        let rt = Runtime::new().map_err(|e| ServerError {
-            message: format!("Failed to create Tokio runtime: {}", e),
-        })?;
-
-        let valnod = match rt.block_on(Self::run()) {
-            Ok(value) => value,
-            Err(e) => {
-                return Err(ServerError {
-                    message: format!("Failed to run async screencast session: {}", e),
-                })
-            }
-        };
-
-        let videosrc = gst::ElementFactory::make("pipewiresrc")
-            .property("path", valnod.to_string())
-            .build()
-            .map_err(|_| ServerError {
-                message: "Failed to create pipewiresrc".to_string(),
-            })?;
-
-        Self::create_common_pipeline(videosrc, DimensionToCrop {
-            top: 0,
-            bottom: 100,
-            right: 400,
-            left: 30,
-        })
-    }
-
-    #[cfg(target_os = "macos")]
-    fn create_pipeline_macos(capture_region: DimensionToCrop) -> Result<Pipeline, ServerError> {
+        #[cfg(target_os = "macos")]
         let videosrc = gst::ElementFactory::make("avfvideosrc")
             .property("capture-screen", true)
-            .property("device-index", &0)
+            .property("device-index", &device_index)
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
-        // Successivamente, passa la sorgente video alla funzione comune per creare il resto della pipeline
-        Self::create_common_pipeline(videosrc, capture_region)
+        cfg_if! {
+            if #[cfg(target_os = "linux")] {
+                let rt = Runtime::new().map_err(|e| ServerError {
+                    message: format!("Failed to create Tokio runtime: {}", e),
+                })?;
+
+                let valnod = match rt.block_on(Self::run()) {
+                    Ok(value) => value,
+                    Err(e) => {
+                        return Err(ServerError {
+                            message: format!("Failed to run async screencast session: {}", e),
+                        })
+                    }
+                };
+
+                let videosrc = gst::ElementFactory::make("pipewiresrc")
+                    .property("path", valnod.to_string())
+                    .build()
+                    .map_err(|_| ServerError {
+                        message: "Failed to create pipewiresrc".to_string(),
+                    })?;
+        }
     }
-    
-    fn create_common_pipeline(videosrc: gst::Element, crop: DimensionToCrop) -> Result<Pipeline, ServerError> {
+
+
+
+
         let videocrop = gst::ElementFactory::make("videocrop")
             .property("bottom", &crop.bottom)
             .property("top", &crop.top)
@@ -337,7 +290,6 @@ impl ScreenStreamer {
             let mut clients = self.clients.lock().unwrap();
             clients.push(client_addr.clone());
         }
-
 
         println!("Added client: {}", client_addr);
 

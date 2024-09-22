@@ -190,7 +190,8 @@ impl StreamerClient {
                 if let Some(pipeline) = pipeline_clone {
                     pipeline.set_state(State::Null).unwrap();
                 }
-                println!("Closing render window.");
+                println!("Closing render window. Press ENTER to close the client.");
+
             });
 
             let mut streaming = self.is_streaming.lock().unwrap();
@@ -204,6 +205,7 @@ impl StreamerClient {
             pipeline.set_state(State::Null).unwrap();
         }
         self.pipeline = None;
+        println!("Streaming stopped.");
     }
 
 

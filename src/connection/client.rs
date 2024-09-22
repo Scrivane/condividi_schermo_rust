@@ -103,7 +103,7 @@ impl DiscoveryClient {
         let server_addr = SockAddr::from(broadcast_addr);
         self.socket.set_broadcast(true)?;
 
-        println!("Sending DISCONNECT message to {:?}", server_addr);
+        println!("Sending DISCONNECT message to {:?}", server_addr.as_socket_ipv4().unwrap().ip());
 
         let disconnect_message = format!("DISCONNECT:{}", self.local_port);
         self.socket.send_to(disconnect_message.as_bytes(), &server_addr)?;
@@ -121,6 +121,7 @@ impl Drop for DiscoveryClient {
         fn drop(&mut self) {
             // Perform cleanup actions when the DiscoveryClient is dropped
             println!("Dropping DiscoveryClient and closing socket bound to port {}", self.local_port);
+            self.notify_disconnection().unwrap();
     
             // Explicitly set the socket to None to close it
             // This is not strictly necessary because Rust automatically drops the socket

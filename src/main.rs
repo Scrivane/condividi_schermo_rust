@@ -134,7 +134,6 @@ fn start_client() -> Result<(), Box<dyn Error>> {
 
     //player.stop_recording()?;
     player.stop_streaming();
-    discovery_client.notify_disconnection()?;
 
     Ok(())
 }
