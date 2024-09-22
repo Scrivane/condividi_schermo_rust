@@ -102,11 +102,39 @@ impl ScreenStreamer {
 
         cfg_if! {
             if #[cfg(target_os = "linux")] {
+                async fn pipewirerec() -> ashpd::Result<u32> {
+                    let proxy = Screencast::new().await?;
+                    let mut valnode: u32 = 0;
+            
+                    let session = proxy.create_session().await?;
+                    proxy
+                        .select_sources(
+                            &session,
+                            CursorMode::Metadata,
+                            SourceType::Monitor | SourceType::Window,
+                            true,
+                            None,
+                            PersistMode::DoNot,
+                        )
+                        .await?;
+            
+                    let response = proxy
+                        .start(&session, &WindowIdentifier::default())
+                        .await?
+                        .response()?;
+                    response.streams().iter().for_each(|stream| {
+                        println!("node id: {}", stream.pipe_wire_node_id());
+                        println!("size: {:?}", stream.size());
+                        println!("position: {:?}", stream.position());
+                        valnode = stream.pipe_wire_node_id();
+                    });
+                    Ok(valnode)
+                }
                 let rt = Runtime::new().map_err(|e| ServerError {
                     message: format!("Failed to create Tokio runtime: {}", e),
                 })?;
 
-                let valnod = match rt.block_on(Self::run()) {
+                let valnod = match rt.block_on(pipewirerec()) {
                     Ok(value) => value,
                     Err(e) => {
                         return Err(ServerError {
