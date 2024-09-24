@@ -2,18 +2,24 @@ use std::env;
 use std::error::Error;
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
+use cfg_if::cfg_if;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use display_info::DisplayInfo;
 
 mod streamer;
 mod connection;
+#[cfg(feature = "icedf")]
+mod GUI_ADR;
+#[cfg(feature = "icedf")]
+use crate::GUI_ADR::gui_test::run_iced;
 
 
 use streamer::streamer::ScreenStreamer;
 use streamer::client::StreamerClient;
 use connection::client::DiscoveryClient;
 use connection::server::DiscoveryServer;
+
 
 #[cfg(target_os = "macos")]
 #[link(name = "foundation", kind = "framework")]
@@ -50,11 +56,84 @@ fn handle_event(sender: mpsc::Sender<ControlMessage>) -> Result<(), Box<dyn Erro
     disable_raw_mode()?;
     Ok(())
 }
+#[cfg(feature = "icedf")]
+fn start_streamer(num_monitor:usize) -> Result<(), Box<dyn Error>> { //mettere se si prova in modalità iced
+    
+  
+    
 
-fn start_streamer() -> Result<(), Box<dyn Error>> {
+   
+    let (control_sender, control_receiver) = mpsc::channel();
+    let (client_sender, client_receiver) = mpsc::channel();
 
-    let num_monitor = select_monitor();
+    let streamer = ScreenStreamer::new(num_monitor)?;
+    let streamer_arc = Arc::new(Mutex::new(streamer));
 
+    let mut discovery_server = DiscoveryServer::new(client_sender);
+    let discovery_thread = thread::spawn(move || {
+        println!("Starting discovery server...");
+        discovery_server.run_discovery_listener().expect("Failed to run discovery server");
+    });
+
+    // Gestisce i comandi di controllo in un thread separato
+    let streamer_arc_clone = Arc::clone(&streamer_arc);
+    let control_thread = thread::spawn(move || {
+        while let Ok(message) = control_receiver.recv() {
+            let mut streamer = streamer_arc_clone.lock().unwrap();
+            match message {
+                ControlMessage::Pause => streamer.pause(),
+                ControlMessage::Resume => streamer.start().unwrap(),
+                ControlMessage::Stop => {
+                    streamer.stop();
+                    break;
+                }
+
+            }
+        }
+    });
+
+    // Gestisce l'aggiunta di nuovi client in un altro thread
+    let streamer_arc_clone = Arc::clone(&streamer_arc);
+    let client_thread = thread::spawn(move || {
+        while let Ok(client_list) = client_receiver.recv() {
+            let client_list_clone = client_list.clone();
+            let  streamer = streamer_arc_clone.lock().unwrap();
+            streamer.update_clients(client_list);
+            println!("Client list update: {}", client_list_clone);
+        }
+    });
+
+    // Avvia lo streamer e gestisce gli eventi della tastiera
+    {
+        let mut streamer = streamer_arc.lock().unwrap();
+        streamer.start()?;
+        println!(
+            "Streamer started\n\
+            Press CTRL+C to stop the server\n\
+            Press CTRL+P to pause the stream\n\
+            Press CTRL+R to resume the stream"
+        );
+    }
+
+    handle_event(control_sender)?;
+
+    // Aspetta la terminazione dei thread
+    control_thread.join().expect("Control thread panicked");
+    client_thread.join().expect("Client thread panicked");
+    discovery_thread.join().expect("Discovery thread panicked");
+
+    Ok(())
+}
+
+#[cfg(not(feature = "icedf"))]
+fn start_streamer() -> Result<(), Box<dyn Error>> { //mettere se si prova in modalità iced
+
+
+    let num_monitor=select_monitor();
+    
+    
+
+   
     let (control_sender, control_receiver) = mpsc::channel();
     let (client_sender, client_receiver) = mpsc::channel();
 
@@ -168,8 +247,18 @@ fn select_monitor() -> usize {
     }
     selected_monitor
 }
+#[cfg(feature = "icedf")]
+fn main()  {
+    run_iced();
+}
 
+#[cfg(not(feature = "icedf"))]
 fn main() -> Result<(), Box<dyn Error>> {
+  
+
+    
+    
+    
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         return Err("Usage: <program> [streamer|client]".into());
@@ -180,7 +269,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "client" => start_client(),
         _ => Err("Invalid mode. Use 'streamer' or 'client'".into()),
     }
-    
+  
+
 }
 
 /// macOS ha bisogno di un run loop per aprire finestre e utilizzare OpenGL.
