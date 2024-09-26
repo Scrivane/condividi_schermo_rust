@@ -18,11 +18,12 @@ use connection::server::DiscoveryServer;
 
 
 //ROBA PER GUI
-use iced::widget::{Button, Column, Text};
-use iced::{Element, Sandbox, Settings};
+use iced::{alignment, Element, Length, Sandbox, Settings};
+use iced::widget::{container, text, Column, column};
 
-#[derive(Default)]
-struct MyApp;
+#[derive(Default, Debug)]
+struct ScreenSharer{
+}
 
 #[derive(Debug, Clone, Copy)]
 enum Message {
@@ -30,7 +31,7 @@ enum Message {
     ClientPressed,
 }
 
-impl Sandbox for MyApp {
+impl Sandbox for ScreenSharer {
     type Message = Message;
 
     fn new() -> Self {
@@ -38,7 +39,7 @@ impl Sandbox for MyApp {
     }
 
     fn title(&self) -> String {
-        String::from("Ice GUI Example")
+        String::from("Screen Sharer On Rust")
     }
 
     fn update(&mut self, message: Message) {
@@ -54,29 +55,20 @@ impl Sandbox for MyApp {
         }
     }
 
-    fn view(&self) -> Element<Message> {
-        let text = Text::new("Select an option:");
+    fn theme(&self) -> iced::Theme {
+		iced::Theme::Dark
+	}
 
-        let streamer_button = Button::new(Text::new("Run Streamer"))
-            .on_press(Message::StreamerPressed);
-
-        let client_button = Button::new(Text::new("Run Client"))
-            .on_press(Message::ClientPressed);
-
-        // Imposta la colonna con il testo e i bottoni
-        Column::new()
-            .push(text)
-            .push(streamer_button)
-            .push(client_button)
-            .into()
+    fn view(&self) -> Element<Self::Message> {
+        container(
+            text("Hello World")
+        )
+        .height(Length::Fill)
+        .width(Length::Fill)
+        .align_x(alignment::Horizontal::Center)
+        .align_y(alignment::Vertical::Center)
+        .into()
     }
-}
-
-
-#[cfg(target_os = "macos")]
-#[link(name = "foundation", kind = "framework")]
-extern "C" {
-    fn CFRunLoopRun();
 }
 
 
@@ -239,26 +231,9 @@ fn select_monitor() -> usize {
     selected_monitor
 }
 
-fn main_logic() {
-    MyApp::run(Settings::default());  
-}
+
 
 fn main() -> Result<(), Box<dyn Error>> {
-    MyApp::run(Settings::default());
+    ScreenSharer::run(Settings::default());
     Ok(())
-}
-
-/// macOS ha bisogno di un run loop per aprire finestre e utilizzare OpenGL.
-#[cfg(target_os = "macos")]
-pub fn run<F: FnOnce() + Send + 'static>(main: F) {
-    std::thread::spawn(main);
-
-    unsafe {
-        CFRunLoopRun();
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn run<F: FnOnce() + Send + 'static>(main: F) {
-    main();
 }
