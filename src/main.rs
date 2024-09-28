@@ -19,10 +19,12 @@ use connection::server::DiscoveryServer;
 
 //ROBA PER GUI
 use iced::{alignment, Element, Length, Sandbox, Settings};
-use iced::widget::{container, text, Column, column};
+use iced::widget::{button, column, container, text, text_input, Button, Column, row};
 
 #[derive(Default, Debug)]
 struct ScreenSharer{
+    button_streamer_state: button::State,
+    button_client_state: button::State
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -35,7 +37,10 @@ impl Sandbox for ScreenSharer {
     type Message = Message;
 
     fn new() -> Self {
-        Self::default()
+        Self {
+            button_client_state: button::State::new(),
+            button_streamer_state: button::State::new(),
+        }
     }
 
     fn title(&self) -> String {
@@ -61,17 +66,19 @@ impl Sandbox for ScreenSharer {
 
     fn view(&self) -> Element<Self::Message> {
         container(
-            text("Hello World")
+            row!(
+                button("Start Streamer")
+                .on_press(Message::StreamerPressed),
+
+                button("Start Client")
+                .on_press(Message::ClientPressed),
+            )
         )
-        .height(Length::Fill)
-        .width(Length::Fill)
         .align_x(alignment::Horizontal::Center)
         .align_y(alignment::Vertical::Center)
         .into()
     }
 }
-
-
 
 enum ControlMessage {
     Pause,
@@ -236,4 +243,5 @@ fn select_monitor() -> usize {
 fn main() -> Result<(), Box<dyn Error>> {
     ScreenSharer::run(Settings::default());
     Ok(())
+    
 }
