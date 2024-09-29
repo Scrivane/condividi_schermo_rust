@@ -16,6 +16,12 @@ use streamer::streamer::DimensionToCrop;
 use connection::client::DiscoveryClient;
 use connection::server::DiscoveryServer;
 
+#[cfg(target_os = "macos")]
+#[link(name = "foundation", kind = "framework")]
+extern "C" {
+    fn CFRunLoopRun();
+}
+
 
 //ROBA PER GUI
 use iced::{alignment, Element, Length, Sandbox, Settings};
@@ -51,11 +57,15 @@ impl Sandbox for ScreenSharer {
         match message {
             Message::StreamerPressed => {
                 println!("Streamer button pressed!");
-                start_streamer();
+                thread::spawn(|| {
+                    start_streamer();
+                });
             }
             Message::ClientPressed => {
                 println!("Client button pressed!");
-                start_client();
+                thread::spawn(|| {
+                    start_client();
+                });
             }
         }
     }
@@ -243,5 +253,5 @@ fn select_monitor() -> usize {
 fn main() -> Result<(), Box<dyn Error>> {
     ScreenSharer::run(Settings::default());
     Ok(())
-    
 }
+
