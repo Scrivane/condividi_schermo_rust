@@ -12,6 +12,8 @@ use iced::{Center, Color, Fill, Font, Pixels};
 use display_info::DisplayInfo;
 
 
+use std::net::IpAddr;
+
 
 
 pub fn run_iced() -> iced::Result {
@@ -78,8 +80,11 @@ impl Tooltip {
             Message::ClientPressed => {
                 
                     self.userType = UserType::client;
+               
+                    let ip:IpAddr=self.input_value_client.clone().trim().parse::<IpAddr>().unwrap();
                     std::thread::spawn(move || {
-                    crate::start_client();// non elegante
+
+                    crate::start_client(ip);// non elegante
                     });
 
                     println!("{:?}",&self.userType);
@@ -146,7 +151,14 @@ impl Tooltip {
 
       let clientSection=column![]
       .push("Write the ip adress of the sharer").push(text_input_client)
-      .push(padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed));
+
+
+
+      .push_maybe(self.can_continue_client().then(|| {
+        padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed)
+    })).push_maybe( (!self.can_continue_client()).then(|| {
+        "Invalid ip, try to insert an other one "
+    }));
 
 
 
@@ -236,6 +248,14 @@ impl Tooltip {
                     return false;
                 }
             }
+
+    }
+
+
+    fn can_continue_client(&self) -> bool {  //valuta se l'ip inserito è valido "migliorabile controllando se è un ip raggiungibile"
+
+
+        self.input_value_client.clone().trim().parse::<IpAddr>().is_ok()
 
     }
 

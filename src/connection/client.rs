@@ -35,6 +35,8 @@ impl DiscoveryClient {
         Ok(DiscoveryClient { socket, local_port })
     }
 
+
+    #[cfg(not(feature = "icedf"))]
     pub fn discover_server(&self) -> Result<(String,i32), io::Error> {
         let broadcast_ip =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
@@ -46,6 +48,71 @@ impl DiscoveryClient {
         let sock_addr = SockAddr::from(broadcast_addr);
 
         println!("Sending DISCOVERY message to {:?}", broadcast_ip);
+
+        self.socket.set_broadcast(true)?;
+
+        let discovery_message = "DISCOVERY";
+        self.socket.send_to(discovery_message.as_bytes(), &sock_addr)?;
+        println!("Sent DISCOVERY message with local port: {}", self.local_port);
+
+
+        let mut buf = [MaybeUninit::uninit(); 1024];
+        let mut ris: Result<(String, i32), io::Error>=Result::Ok(("mdjisf".to_string(),4));
+
+    // Use a while loop to wait until we get the first successful response
+     while {
+        ris = match self.socket.recv_from(&mut buf) {
+            Ok((amt, src)) => {
+
+                let initialized_buf = unsafe {
+                    std::slice::from_raw_parts(buf.as_ptr() as *const u8, amt)
+                };
+            
+                let server_response = String::from_utf8_lossy(initialized_buf).to_string();
+
+                println!("Received response: {} from {:?}", server_response, src.as_socket_ipv4().unwrap().ip());
+                let ip_addr: IpAddr = src.as_socket().expect("no as socket works").ip();
+                println!("the Server IP is {}",ip_addr.to_string());
+                let client_ip = server_response.trim().to_string();
+                return Ok((client_ip, self.local_port as i32));
+            }
+            Err(e) => {
+                if !matches!(e.kind(), ErrorKind::WouldBlock) {
+                    eprintln!("{}", e);
+                } else {
+                    println!("Failed to receive response: {}", e);
+                }
+                Err(e)
+            }
+        };
+        
+
+        ris.is_err()
+    } {}
+
+    // If the loop exits without a successful result, return an error
+    ris
+    }
+
+
+
+
+
+
+
+
+    #[cfg(feature = "icedf")]
+    pub fn discover_server(&self,server_adress_ip:IpAddr) -> Result<(String,i32), io::Error> {
+        let broadcast_ip =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
+
+        
+        //let serverAdress = SocketAddrV4::new(serverAdressIp, 9000);
+        //#[cfg(target_os = "linux")]
+        let server_adress = SocketAddr::new(server_adress_ip, 9000);
+
+        let sock_addr = SockAddr::from(server_adress);
+
+        println!("Sending DISCOVERY message to {:?}", server_adress_ip);
 
         self.socket.set_broadcast(true)?;
 

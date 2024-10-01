@@ -1,5 +1,6 @@
 use std::env;
 use std::error::Error;
+use std::net::IpAddr;
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use cfg_if::cfg_if;
@@ -196,6 +197,34 @@ fn start_streamer() -> Result<(), Box<dyn Error>> { //mettere se si prova in mod
     Ok(())
 }
 
+
+#[cfg(feature = "icedf")]
+fn start_client(ip_addr: IpAddr) -> Result<(), Box<dyn Error>> {
+    let discovery_client = DiscoveryClient::new()?;
+
+    let (client_ip,client_port) = discovery_client.discover_server(ip_addr)?;
+    //let client_port_clone = client_port.clone();
+    
+
+   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
+    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
+
+    player.start_streaming()?;
+    println!("Client started at port {}. Press Enter to stop...", &client_port);
+    //player.start_recording()?;
+
+    let _ = std::io::stdin().read_line(&mut String::new());
+
+    //player.stop_recording()?;
+    player.stop_streaming();
+
+    Ok(())
+}
+
+
+
+
+#[cfg(not(feature = "icedf"))]
 fn start_client() -> Result<(), Box<dyn Error>> {
     let discovery_client = DiscoveryClient::new()?;
     let (client_ip,client_port) = discovery_client.discover_server()?;
