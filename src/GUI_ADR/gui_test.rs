@@ -23,7 +23,7 @@ pub fn run_iced() -> iced::Result {
 #[derive(Default)]
 struct Tooltip {
     position: Position,
-    userType:  UserType,
+    user_type:  UserType,
     input_value_streamer: String,
     input_value_client: String,
 
@@ -79,7 +79,7 @@ impl Tooltip {
 
             Message::ClientPressed => {
                 
-                    self.userType = UserType::client;
+                    self.user_type = UserType::client;
                
                     let ip:IpAddr=self.input_value_client.clone().trim().parse::<IpAddr>().unwrap();
                     std::thread::spawn(move || {
@@ -87,15 +87,15 @@ impl Tooltip {
                     crate::start_client(ip);// non elegante
                     });
 
-                    println!("{:?}",&self.userType);
+                    println!("{:?}",&self.user_type);
        
             }
             Message::StreamerPressed => {
                 
-                self.userType = UserType::streamer;
-                let idSreen:usize=self.input_value_streamer.clone().trim().parse().unwrap();
+                self.user_type = UserType::streamer;
+                let id_sreen:usize=self.input_value_streamer.clone().trim().parse().unwrap();
                 std::thread::spawn(move || {
-                    crate::start_streamer(idSreen);
+                    crate::start_streamer(id_sreen);
                     
                 });
                 // non elegante
@@ -121,21 +121,21 @@ impl Tooltip {
         )
         .gap(10)
         .style(container::rounded_box);*/
-        let valueClient = &self.input_value_client;
-        let valueStreamer = &self.input_value_streamer;
+        let value_client = &self.input_value_client;
+        let value_streamer = &self.input_value_streamer;
 
-        let mut text_input_streamer = text_input("es.. 0", &valueStreamer)
+        let mut text_input_streamer = text_input("es.. 0", &value_streamer)
         .on_input(Message::InputChangedStreamer)
         .padding(10)
         .size(30);
-        let mut text_input_client = text_input("es.. 198.154.1.12", &valueClient)
+        let mut text_input_client = text_input("es.. 198.154.1.12", &value_client)
         .on_input(Message::InputChangedClient)
         .padding(10)
         .size(30); 
 
 
 
-      let stremerSection=column![]
+      let streamer_section=column![]
       
      // .push(padded_button("Start sharing screen").on_press(Message::StreamerPressed))
       .push("Write the id of the screen you want to stream from")
@@ -149,7 +149,7 @@ impl Tooltip {
       
       
 
-      let clientSection=column![]
+      let client_section=column![]
       .push("Write the ip adress of the sharer").push(text_input_client)
 
 
@@ -182,11 +182,11 @@ impl Tooltip {
 
 
    
-       let controls:iced::widget::Row<'_, Message>=match self.userType {
+       let controls:iced::widget::Row<'_, Message>=match self.user_type {
         UserType::None=>  {row![]
-        .push(stremerSection)
+        .push(streamer_section)
         .push(horizontal_space())
-        .push( clientSection)}
+        .push(client_section)}
       UserType::client=>  {row![]
         .push(client_section_started)}
         //.push(horizontal_space())
