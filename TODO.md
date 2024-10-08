@@ -1,6 +1,6 @@
 | numero | descrizione | chi se ne occupa |
 | ------ | ------ | ------ |
-| 1 | rendere i bottoni gui per chiudere stream(sia client che streamer ) funzionanti | |
+| 1 | rendere i bottoni gui per chiudere stream(sia client che streamer ) funzionanti | Adriano |
 | 2 | far in modo che lato client che l'ip inserito sia quello a cui ci si connette | Adriano |
 | 3 | implentare un tool che permetta di selezionare una parte dello schermo (per far stream di solo quella parte) | |
 | 4 | gestire recording lato gui |  |
