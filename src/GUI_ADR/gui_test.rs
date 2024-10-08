@@ -13,6 +13,7 @@ use display_info::DisplayInfo;
 
 
 use std::net::IpAddr;
+use get_if_addrs::get_if_addrs;
 
 
 
@@ -94,6 +95,19 @@ impl Tooltip {
                 
                 self.user_type = UserType::streamer;
                 let id_sreen:usize=self.input_value_streamer.clone().trim().parse().unwrap();
+
+                match get_if_addrs() {
+                    Ok(interfaces) => {
+                        println!("Bound to the following network interfaces:");
+                        for iface in interfaces {
+                            println!("Interface: {}, IP: {:?}", iface.name, iface.ip());
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error retrieving network interfaces: {}", e);
+                    }
+                }
+
                 std::thread::spawn(move || {
                     crate::start_streamer(id_sreen);
                     

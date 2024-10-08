@@ -2,6 +2,7 @@ use std::net::{UdpSocket};
 use std::sync::mpsc;
 use std::error::Error;
 
+
 pub struct DiscoveryServer {
     sender: mpsc::Sender<String>,
     clients: String,
@@ -17,6 +18,8 @@ impl DiscoveryServer {
 
     pub fn run_discovery_listener(&mut self) -> Result<(), Box<dyn Error>> {
         let socket = UdpSocket::bind("0.0.0.0:9000")?;
+
+
 
         println!("Discovery server is listening in {}",socket.local_addr().unwrap());
 

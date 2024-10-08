@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 #message-io = { version = "0.18", default-features = false, features = ["websocket"] } da valutare come soluzione alternativa
-gst = { package = "gstreamer", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" }
-gst-base = { package = "gstreamer-base", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" }
-gst-video = { package = "gstreamer-video", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" }
+gst = { package = "gstreamer", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" , tag= "0.23.0" }
+gst-base = { package = "gstreamer-base", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs",tag= "0.23.0" }
+gst-video = { package = "gstreamer-video", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs", tag= "0.23.0" }
 gstreamer-video = "0.23.0"
 gstreamer-rtp = "0.23.0"
 gstreamer-rtsp-server = "0.23.0"
@@ -24,6 +24,7 @@ ws = "0.9.1"
 socket2 = "0.5.7"
 display-info = "0.5.1"
 iced = "0.13.1"
+get_if_addrs = "0.5.3"
 
 
 
