@@ -27,6 +27,7 @@ struct Tooltip {
     user_type:  UserType,
     input_value_streamer: String,
     input_value_client: String,
+    ips:    String,
 
 }
 #[derive(Default,Debug)]
@@ -98,10 +99,19 @@ impl Tooltip {
 
                 match get_if_addrs() {
                     Ok(interfaces) => {
+                        
+                        let mut all_ips=String::new();
                         println!("Bound to the following network interfaces:");
                         for iface in interfaces {
                             println!("Interface: {}, IP: {:?}", iface.name, iface.ip());
+                            if iface.name!="lo"{
+                                all_ips.push_str(&iface.ip().to_string());
+                                all_ips.push_str(" , ");
+                            }
+
+                     
                         }
+                        self.ips=all_ips;
                     }
                     Err(e) => {
                         eprintln!("Error retrieving network interfaces: {}", e);
@@ -178,8 +188,8 @@ impl Tooltip {
 
       let stremer_section_started =  Self::container("Streamer")
       .push(
-          "Currently streaming",
-      ).push(padded_button("End Stream")
+          "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )",
+      ).push(Text::new(&self.ips)).push(padded_button("End Stream")
      // .on_press(Message::ClientPressed) fa nulla da implementare
     
     );
