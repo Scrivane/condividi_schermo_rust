@@ -108,6 +108,8 @@ impl Tooltip {
                     });
                 }
                 self.user_type = UserType::None;
+
+                println!("ho finot lo stream {:?}",&self.user_type);
             }
             Message::StreamerPressed => {
                 
@@ -215,7 +217,7 @@ impl Tooltip {
   .push(
       "Currently receiving screencast",
   ).push(padded_button("End client")
-  .on_press(Message::ClientPressed)   
+  .on_press(Message::StopClientPressed)   
 );
   //.push(padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed));;
 
