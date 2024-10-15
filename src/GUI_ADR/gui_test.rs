@@ -16,6 +16,7 @@ use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
 
 use crate::streamer::client::StreamerClient;
+use crate::StreamerState;
 
 
 
@@ -31,7 +32,7 @@ struct Tooltip {
     input_value_client: String,
     ips:    String,
     streamer_client: Option<StreamerClient>,
-
+    streamer_state: Option<StreamerState>,
 }
 #[derive(Default,Debug)]
 enum UserType{  // sposta in main qunado è ora, di default è clioent
@@ -48,6 +49,7 @@ enum Message {
     ChangePosition,
     StreamerPressed,
     ClientPressed,
+    StopStreamerPressed,
     StopClientPressed,
     InputChangedStreamer(String),
     InputChangedClient(String),
@@ -112,46 +114,67 @@ impl Tooltip {
                 println!("ho finot lo stream {:?}",&self.user_type);
             }
             Message::StreamerPressed => {
-                
                 self.user_type = UserType::streamer;
-                let id_sreen:usize=self.input_value_streamer.clone().trim().parse().unwrap();
+                let id_screen: usize = self.input_value_streamer.clone().trim().parse().unwrap();
 
                 match get_if_addrs() {
                     Ok(interfaces) => {
-                        
-                        let mut all_ips=String::new();
+                        let mut all_ips = String::new();
                         println!("Bound to the following network interfaces:");
                         for iface in interfaces {
                             println!("Interface: {}, IP: {:?}", iface.name, iface.ip());
-                            if iface.name!="lo" && iface.ip().to_string()!="::1"{
+                            if iface.name != "lo" && iface.ip().to_string() != "::1" {
                                 all_ips.push_str(&iface.ip().to_string());
                                 all_ips.push_str(" , ");
                             }
-
-                     
                         }
-                        self.ips=all_ips;
+                        self.ips = all_ips;
                     }
                     Err(e) => {
                         eprintln!("Error retrieving network interfaces: {}", e);
                     }
                 }
 
-                std::thread::spawn(move || {
-                    crate::start_streamer(id_sreen);
-                    
-                });
-                // non elegante
-                //println!("{:?}",&self.userType);
-   
-        }
+                // Start the streamer in a separate thread and store the result in self.streamer_state.
 
-        Message::InputChangedStreamer(input_value) => {
-            self.input_value_streamer = input_value;
-        }
-        Message::InputChangedClient(input_value) => {
-            self.input_value_client = input_value;
-        }
+              
+
+                let streamer_state = std::thread::spawn(move || {
+                    crate::start_streamer(0).unwrap()
+                });
+                if let Ok(streamer) = streamer_state.join() {
+                    self.streamer_state = Some(streamer);
+                    println!("Streamer started.");
+                }
+                else {
+                    println!("Streamer DID NOT started.");
+                    
+                }
+                
+                
+
+               
+                
+            }
+        
+            Message::StopStreamerPressed => {
+                
+                if let Some(state) = self.streamer_state.take() {
+                    std::thread::spawn(move || {
+                        crate::stop_streamer(state).expect("Failed to stop streamer");
+                    });
+                    println!("Streamer stopped.");
+                    self.user_type = UserType::None;
+                } else {
+                    println!("No active streamer to stop.");
+                }
+            }
+            Message::InputChangedStreamer(input_value) => {
+                self.input_value_streamer = input_value;
+            }
+            Message::InputChangedClient(input_value) => {
+                self.input_value_client = input_value;
+            }
         }
     }
 
@@ -209,7 +232,7 @@ impl Tooltip {
       .push(
           "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )",
       ).push(Text::new(&self.ips)).push(padded_button("End Stream")
-     // .on_press(Message::ClientPressed) fa nulla da implementare
+      .on_press(Message::StopStreamerPressed) 
     
     );
 
