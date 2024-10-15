@@ -107,6 +107,7 @@ impl Tooltip {
                         crate::stop_client(player).unwrap(); // Handle error appropriately
                     });
                 }
+                self.user_type = UserType::None;
             }
             Message::StreamerPressed => {
                 
