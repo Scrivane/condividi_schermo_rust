@@ -199,6 +199,33 @@ fn start_streamer() -> Result<(), Box<dyn Error>> { //mettere se si prova in mod
 
 
 #[cfg(feature = "icedf")]
+fn start_client(ip_addr: IpAddr) -> Result<StreamerClient, Box<dyn Error>> {
+    let discovery_client = DiscoveryClient::new()?;
+
+    let (client_ip,client_port) = discovery_client.discover_server(ip_addr)?;
+    //let client_port_clone = client_port.clone();
+    
+
+   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
+    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
+    player.start_streaming()?;
+
+    
+
+    Ok(player)
+}
+
+#[cfg(feature = "icedf")]
+fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
+    
+        //player.stop_recording()?;
+    player.stop_streaming();
+
+    Ok(())
+
+
+}
+/* 
 fn start_client(ip_addr: IpAddr) -> Result<(), Box<dyn Error>> {
     let discovery_client = DiscoveryClient::new()?;
 
@@ -222,6 +249,29 @@ fn start_client(ip_addr: IpAddr) -> Result<(), Box<dyn Error>> {
 }
 
 
+*/
+
+#[cfg(not(feature = "icedf"))]
+fn start_client() -> Result<(), Box<dyn Error>> {
+    let discovery_client = DiscoveryClient::new()?;
+    let (client_ip,client_port) = discovery_client.discover_server()?;
+    //let client_port_clone = client_port.clone();
+    
+
+   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
+    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
+
+    player.start_streaming()?;
+    println!("Client started at port {}. Press Enter to stop...", &client_port);
+    //player.start_recording()?;
+
+    let _ = std::io::stdin().read_line(&mut String::new());
+
+    //player.stop_recording()?;
+    player.stop_streaming();
+
+    Ok(())
+}
 
 
 #[cfg(not(feature = "icedf"))]

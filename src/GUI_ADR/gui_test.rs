@@ -15,6 +15,8 @@ use display_info::DisplayInfo;
 use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
 
+use crate::streamer::client::StreamerClient;
+
 
 
 pub fn run_iced() -> iced::Result {
@@ -28,6 +30,7 @@ struct Tooltip {
     input_value_streamer: String,
     input_value_client: String,
     ips:    String,
+    streamer_client: Option<StreamerClient>,
 
 }
 #[derive(Default,Debug)]
@@ -45,6 +48,7 @@ enum Message {
     ChangePosition,
     StreamerPressed,
     ClientPressed,
+    StopClientPressed,
     InputChangedStreamer(String),
     InputChangedClient(String),
 }
@@ -84,13 +88,25 @@ impl Tooltip {
                     self.user_type = UserType::client;
                
                     let ip:IpAddr=self.input_value_client.clone().trim().parse::<IpAddr>().unwrap();
-                    std::thread::spawn(move || {
-
-                    crate::start_client(ip);// non elegante
+                    let client_handle = std::thread::spawn(move || {
+                        crate::start_client(ip).unwrap() // in futuro maneggia errori
                     });
+
+                    if let Ok(client) = client_handle.join() {
+                        self.streamer_client = Some(client);
+                    }
 
                     println!("{:?}",&self.user_type);
        
+            }
+
+
+            Message::StopClientPressed => {
+                if let Some(mut player) = self.streamer_client.take() {
+                    std::thread::spawn(move || {
+                        crate::stop_client(player).unwrap(); // Handle error appropriately
+                    });
+                }
             }
             Message::StreamerPressed => {
                 
@@ -104,7 +120,7 @@ impl Tooltip {
                         println!("Bound to the following network interfaces:");
                         for iface in interfaces {
                             println!("Interface: {}, IP: {:?}", iface.name, iface.ip());
-                            if iface.name!="lo"{
+                            if iface.name!="lo" && iface.ip().to_string()!="::1"{
                                 all_ips.push_str(&iface.ip().to_string());
                                 all_ips.push_str(" , ");
                             }
@@ -198,7 +214,7 @@ impl Tooltip {
   .push(
       "Currently receiving screencast",
   ).push(padded_button("End client")
-  //.on_press(Message::ClientPressed)    fa nulla
+  .on_press(Message::ClientPressed)   
 );
   //.push(padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed));;
 
