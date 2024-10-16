@@ -4,7 +4,7 @@ descrizione dell'app
 
 ## Installing
 
-## Windows
+### Windows
 
 Per eseguire l'applicazione è necessaria l'installazione del framework di Gstreamer:
   * [Link alla guida](https://gstreamer.freedesktop.org/documentation/installing/on-windows.html?gi-language=c)
