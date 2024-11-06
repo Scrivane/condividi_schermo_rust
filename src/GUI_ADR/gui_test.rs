@@ -138,8 +138,11 @@ impl Tooltip {
                 // Start the streamer in a separate thread and store the result in self.streamer_state.
 
               
-
-                let streamer_state = std::thread::spawn(move || {
+                std::thread::spawn(move || {
+                    crate::start_streamer(0);
+                    
+                });
+                /* let streamer_state = std::thread::spawn(move || {
                     crate::start_streamer(0).unwrap()
                 });
                 if let Ok(streamer) = streamer_state.join() {
@@ -149,7 +152,7 @@ impl Tooltip {
                 else {
                     println!("Streamer DID NOT started.");
                     
-                }
+                } */
                 
                 
 

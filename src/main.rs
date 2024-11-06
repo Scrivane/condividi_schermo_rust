@@ -60,13 +60,13 @@ fn handle_event(sender: mpsc::Sender<ControlMessage>) -> Result<(), Box<dyn Erro
 #[cfg(feature = "icedf")]
 struct StreamerState {
     control_sender: mpsc::Sender<ControlMessage>,
-    control_thread: thread::JoinHandle<()>,
+    /* control_thread: thread::JoinHandle<()>,
     client_thread: thread::JoinHandle<()>,
     discovery_thread: thread::JoinHandle<()>,
-    streamer_arc: Arc<Mutex<ScreenStreamer>>,
+    streamer_arc: Arc<Mutex<ScreenStreamer>>, */
 }
 
-#[cfg(feature = "icedf")]
+#[cfg(not(feature = "icedf"))]
 fn start_streamer(num_monitor: usize) -> Result<StreamerState, Box<dyn Error>> {
     let (control_sender, control_receiver) = mpsc::channel();
     let (client_sender, client_receiver) = mpsc::channel();
@@ -132,17 +132,17 @@ fn stop_streamer(state: StreamerState) -> Result<(), Box<dyn Error>> {
     state.control_sender.send(ControlMessage::Stop)?;
 
     // Wait for all threads to finish
-    state.control_thread.join().expect("Control thread panicked");
+    /* state.control_thread.join().expect("Control thread panicked");
     state.client_thread.join().expect("Client thread panicked");
-    state.discovery_thread.join().expect("Discovery thread panicked");
+    state.discovery_thread.join().expect("Discovery thread panicked"); */
 
     println!("Streamer stopped successfully.");
 
     Ok(())
 }
 
-/* 
-fn start_streamer(num_monitor:usize) -> Result<(), Box<dyn Error>> { //mettere se si prova in modalità iced
+
+fn start_streamer(num_monitor:usize) -> Result<StreamerState, Box<dyn Error>> { //mettere se si prova in modalità iced
     
   
 
@@ -201,14 +201,17 @@ fn start_streamer(num_monitor:usize) -> Result<(), Box<dyn Error>> { //mettere s
     handle_event(control_sender)?;
 
     // Aspetta la terminazione dei thread
-    control_thread.join().expect("Control thread panicked");
+    /* control_thread.join().expect("Control thread panicked");
     client_thread.join().expect("Client thread panicked");
     discovery_thread.join().expect("Discovery thread panicked");
-
-    Ok(())
+ */
+Ok(StreamerState {
+    control_sender
+  
+})
 }
 
-*/
+
 
 #[cfg(not(feature = "icedf"))]
 fn start_streamer() -> Result<(), Box<dyn Error>> { //mettere se si prova in modalità iced
