@@ -42,7 +42,7 @@ impl ScreenStreamer {
             left: 300,
         };
 
-        let pipeline = Self::create_pipeline(capture_region, monitor_id)?;
+        let pipeline = Self::create_pipeline(capture_region, monitor_id).expect("errore creazioen pipeline screenstremer");
 
 
         let bus = pipeline.bus().unwrap();

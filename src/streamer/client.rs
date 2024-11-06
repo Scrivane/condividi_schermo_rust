@@ -149,7 +149,7 @@ impl StreamerClient {
             let pipeline_clone = self.pipeline.clone();
 
             thread::spawn(move || {
-                let timeout = Duration::from_secs(10);
+                let timeout = Duration::from_secs(30);
                 let mut last_msg_time = std::time::Instant::now();
 
                 loop {
