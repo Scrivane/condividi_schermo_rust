@@ -87,7 +87,7 @@ impl ScreenStreamer {
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
             .property("show-cursor", true)
             .property("monitor-index", &(device_index as i32))
-            .property("show-border", true)
+            //.property("show-border", true)
             .build()
             .map_err(|_| ServerError {
                 message: "Failed to create d3d11screencapturesrc".to_string(),
