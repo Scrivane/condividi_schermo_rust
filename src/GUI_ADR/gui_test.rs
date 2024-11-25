@@ -1,3 +1,4 @@
+use clap::error;
 use iced::widget::tooltip::Position;
 use iced::widget::{button, center, container, tooltip};
 use iced::Element;
@@ -6,10 +7,19 @@ use iced::widget::{
     scrollable, slider, text, text_input, toggler, vertical_space
 };
 use iced::widget::{Button, Column, Container, Slider,Text};
-use iced::{Center, Color, Fill, Font, Pixels};
+use iced::{Center, Color, Fill, Font, Pixels,Subscription};
+use iced::{Task};
+use ashpd::{
+    desktop::{
+        screencast::{CursorMode, Screencast, SourceType},
+        PersistMode,
+    },
+    WindowIdentifier,
+};
 
 
 use display_info::DisplayInfo;
+use zbus::fdo::Error;
 
 
 use std::net::IpAddr;
@@ -33,6 +43,7 @@ struct Tooltip {
     ips:    String,
     streamer_client: Option<StreamerClient>,
     streamer_state: Option<StreamerState>,
+    valnode:u32,
 }
 #[derive(Default,Debug)]
 enum UserType{  // sposta in main qunado è ora, di default è clioent
@@ -53,24 +64,15 @@ enum Message {
     StopClientPressed,
     InputChangedStreamer(String),
     InputChangedClient(String),
+    RetIdPipewire,
+    GotValNode(Result<u32,u32>),
 }
 
 impl Tooltip {
-    fn update(&mut self, message: Message) {
-        /*match message {
-            Message::ChangePosition => {
-                let position = match &self.position {
-                    Position::Top => Position::Bottom,
-                    Position::Bottom => Position::Left,
-                    Position::Left => Position::Right,
-                    Position::Right => Position::FollowCursor,
-                    Position::FollowCursor => Position::Top,
-                };
 
-                self.position = position;
-            }
-        }
-        */
+
+    fn update(&mut self, message: Message) ->Task<Message> {
+
 
         match message {
             Message::ChangePosition => {
@@ -116,7 +118,7 @@ impl Tooltip {
             Message::StreamerPressed => {
                 self.user_type = UserType::streamer;
                 let id_screen: usize = self.input_value_streamer.clone().trim().parse().unwrap();
-
+         
                 match get_if_addrs() {
                     Ok(interfaces) => {
                         let mut all_ips = String::new();
@@ -138,10 +140,72 @@ impl Tooltip {
                 // Start the streamer in a separate thread and store the result in self.streamer_state.
 
               
-
+                let valnode:usize=self.valnode.clone().try_into().expect("can't convert into usize");
                 let streamer_state = std::thread::spawn(move || {
-                    crate::start_streamer(0).unwrap()
+                    crate::start_streamer(valnode).unwrap()
+                
                 });
+
+/* 
+                fn start_streamer2(num_monitor: usize) -> Result<StreamerState, Box<dyn Error>> {
+                    let (control_sender, control_receiver) = mpsc::channel();
+                    let (client_sender, client_receiver) = mpsc::channel();
+                
+                    let streamer = ScreenStreamer::new(num_monitor).expect("errore creazione scren streamer");
+                    let streamer_arc = Arc::new(Mutex::new(streamer));
+                
+                    let mut discovery_server = DiscoveryServer::new(client_sender);
+                    let discovery_thread = thread::spawn(move || {
+                        println!("Starting discovery server...");
+                        discovery_server.run_discovery_listener().expect("Failed to run discovery server");
+                    });
+                
+                    let streamer_arc_clone = Arc::clone(&streamer_arc);
+                    let control_thread = thread::spawn(move || {
+                        while let Ok(message) = control_receiver.recv() {
+                            let mut streamer = streamer_arc_clone.lock().unwrap();
+                            match message {
+                                ControlMessage::Pause => streamer.pause(),
+                                ControlMessage::Resume => streamer.start().unwrap(),
+                                ControlMessage::Stop => {
+                                    streamer.stop();
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                
+                    let streamer_arc_clone = Arc::clone(&streamer_arc);
+                    let client_thread = thread::spawn(move || {
+                        while let Ok(client_list) = client_receiver.recv() {
+                            let client_list_clone = client_list.clone();
+                            let streamer = streamer_arc_clone.lock().unwrap();
+                            streamer.update_clients(client_list);
+                            println!("Client list updated: {}", client_list_clone);
+                        }
+                    });
+                
+                    {
+                        let mut streamer = streamer_arc.lock().unwrap();
+                        streamer.start().expect("error in starting the streamer");
+                        println!(
+                            "Streamer started\n\
+                            Press CTRL+C to stop the server\n\
+                            Press CTRL+P to pause the stream\n\
+                            Press CTRL+R to resume the stream"
+                        );
+                    }
+                
+                    Ok(StreamerState {
+                        control_sender,
+                        control_thread,
+                        client_thread,
+                        discovery_thread,
+                        streamer_arc,
+                    })
+                } */
+
+
                 if let Ok(streamer) = streamer_state.join() {
                     self.streamer_state = Some(streamer);
                     println!("Streamer started.");
@@ -155,6 +219,23 @@ impl Tooltip {
 
                
                 
+            }
+            Message::RetIdPipewire => {
+                return Task::perform(
+                    pipewirerec(),
+                    Message::GotValNode,
+                );
+
+
+            }
+            Message::GotValNode(r)=>{
+               
+
+                self.valnode=r.expect("Error in deciding valnode");
+                println!("valnode2   :{}",self.valnode);
+                return Task::perform (async { },
+                    |_| Message::StreamerPressed,
+                );
             }
         
             Message::StopStreamerPressed => {
@@ -176,6 +257,7 @@ impl Tooltip {
                 self.input_value_client = input_value;
             }
         }
+        Task::none()
     }
 
     fn view(&self) -> Element<Message> {
@@ -208,7 +290,10 @@ impl Tooltip {
       .push(text_input_streamer)
 
       .push_maybe(self.can_continue_streamer().then(|| {
-        padded_button("Start sharing screen").on_press(Message::StreamerPressed)
+        padded_button("Start sharing screen").
+        on_press(Message::RetIdPipewire)
+        
+       // on_press(Message::StreamerPressed)
     })).push_maybe( (!self.can_continue_streamer()).then(|| {
         "Invalid screen id, try to insert again "
     }));    //rendi più carino
@@ -251,7 +336,7 @@ impl Tooltip {
        let controls:iced::widget::Row<'_, Message>=match self.user_type {
         UserType::None=>  {row![]
         .push(streamer_section)
-        .push(horizontal_space())
+        .push(horizontal_space())  //togli 2
         .push(client_section)}
       UserType::client=>  {row![]
         .push(client_section_started)}
@@ -338,6 +423,35 @@ fn position_to_text<'a>(position: Position) -> &'a str {
         Position::Left => "Left",
         Position::Right => "Right",
     }
+}
+async fn pipewirerec() -> Result<u32,u32>{
+    let proxy = Screencast::new().await.expect("couln not start screencast proxi");
+    let mut valnode: u32 = 0;
+
+    let session = proxy.create_session().await.expect("couln not start screencast session");
+    proxy
+        .select_sources(
+            &session,
+            CursorMode::Metadata,
+            SourceType::Monitor | SourceType::Window,
+            true,  //was true 
+            None,
+            PersistMode::DoNot,
+        )
+        .await.expect("couln not start select sources");
+
+    let response = proxy
+        .start(&session, &WindowIdentifier::default())
+        .await.expect("couln not start response")
+        .response().expect("couln not end response");
+    response.streams().iter().for_each(|stream| {
+        println!("node id: {}", stream.pipe_wire_node_id());
+        println!("size: {:?}", stream.size());
+        println!("position: {:?}", stream.position());
+        valnode = stream.pipe_wire_node_id();
+    });
+    println!("valnode: {:?}", valnode);
+    Ok(valnode)
 }
 
 

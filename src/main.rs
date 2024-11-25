@@ -123,9 +123,67 @@ fn start_streamer(num_monitor: usize) -> Result<StreamerState, Box<dyn Error>> {
         discovery_thread,
         streamer_arc,
     })
+}/* 
+#[cfg(feature = "icedf")]
+fn start_streamer2(valnode: u32) -> Result<StreamerState, Box<dyn Error>> {
+    let (control_sender, control_receiver) = mpsc::channel();
+    let (client_sender, client_receiver) = mpsc::channel();
+
+    let streamer = ScreenStreamer::new(0,valnode).expect("errore creazione scren streamer");
+    let streamer_arc = Arc::new(Mutex::new(streamer));
+
+    let mut discovery_server = DiscoveryServer::new(client_sender);
+    let discovery_thread = thread::spawn(move || {
+        println!("Starting discovery server...");
+        discovery_server.run_discovery_listener().expect("Failed to run discovery server");
+    });
+
+    let streamer_arc_clone = Arc::clone(&streamer_arc);
+    let control_thread = thread::spawn(move || {
+        while let Ok(message) = control_receiver.recv() {
+            let mut streamer = streamer_arc_clone.lock().unwrap();
+            match message {
+                ControlMessage::Pause => streamer.pause(),
+                ControlMessage::Resume => streamer.start().unwrap(),
+                ControlMessage::Stop => {
+                    streamer.stop();
+                    break;
+                }
+            }
+        }
+    });
+
+    let streamer_arc_clone = Arc::clone(&streamer_arc);
+    let client_thread = thread::spawn(move || {
+        while let Ok(client_list) = client_receiver.recv() {
+            let client_list_clone = client_list.clone();
+            let streamer = streamer_arc_clone.lock().unwrap();
+            streamer.update_clients(client_list);
+            println!("Client list updated: {}", client_list_clone);
+        }
+    });
+
+    {
+        let mut streamer = streamer_arc.lock().unwrap();
+        streamer.start().expect("error in starting the streamer");
+        println!(
+            "Streamer started\n\
+            Press CTRL+C to stop the server\n\
+            Press CTRL+P to pause the stream\n\
+            Press CTRL+R to resume the stream"
+        );
+    }
+
+    Ok(StreamerState {
+        control_sender,
+        control_thread,
+        client_thread,
+        discovery_thread,
+        streamer_arc,
+    })
 }
 
-
+ */
 #[cfg(feature = "icedf")]
 fn stop_streamer(state: StreamerState) -> Result<(), Box<dyn Error>> {
     // Send a stop message to the control thread
@@ -358,7 +416,7 @@ fn start_client() -> Result<(), Box<dyn Error>> {
 }
 
 
-#[cfg(not(feature = "icedf"))]
+/* #[cfg(not(feature = "icedf"))]
 fn start_client() -> Result<(), Box<dyn Error>> {
     let discovery_client = DiscoveryClient::new()?;
     let (client_ip,client_port) = discovery_client.discover_server()?;
@@ -378,7 +436,7 @@ fn start_client() -> Result<(), Box<dyn Error>> {
     player.stop_streaming();
 
     Ok(())
-}
+} */
 
 
 fn select_monitor() -> usize {
