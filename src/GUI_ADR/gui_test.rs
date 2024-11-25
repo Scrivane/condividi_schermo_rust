@@ -21,7 +21,7 @@ use ashpd::{
 use display_info::DisplayInfo;
 use zbus::fdo::Error;
 
-
+use cfg_if::cfg_if;
 use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
 
@@ -280,7 +280,14 @@ impl Tooltip {
         .on_input(Message::InputChangedClient)
         .padding(10)
         .size(30); 
-
+    cfg_if! {
+        if #[cfg(target_os = "linux")] {
+        let start_button =padded_button("Start sharing screen").on_press(Message::RetIdPipewire);
+            } else {
+        let start_button =padded_button("Start sharing screen").on_press(Message::StreamerPressed);
+            }
+        }
+        
 
 
       let streamer_section=column![]
@@ -290,8 +297,10 @@ impl Tooltip {
       .push(text_input_streamer)
 
       .push_maybe(self.can_continue_streamer().then(|| {
-        padded_button("Start sharing screen").
-        on_press(Message::RetIdPipewire)
+        start_button
+
+    
+        //on_press(Message::RetIdPipewire)
         
        // on_press(Message::StreamerPressed)
     })).push_maybe( (!self.can_continue_streamer()).then(|| {
