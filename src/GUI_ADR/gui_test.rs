@@ -9,6 +9,8 @@ use iced::widget::{
 use iced::widget::{Button, Column, Container, Slider,Text};
 use iced::{Center, Color, Fill, Font, Pixels,Subscription};
 use iced::{Task};
+
+#[cfg(target_os = "linux")]
 use ashpd::{
     desktop::{
         screencast::{CursorMode, Screencast, SourceType},
@@ -19,6 +21,8 @@ use ashpd::{
 
 
 use display_info::DisplayInfo;
+
+#[cfg(target_os = "linux")]
 use zbus::fdo::Error;
 
 use cfg_if::cfg_if;
@@ -64,6 +68,7 @@ enum Message {
     StopClientPressed,
     InputChangedStreamer(String),
     InputChangedClient(String),
+    #[cfg(target_os = "linux")]
     RetIdPipewire,
     GotValNode(Result<u32,u32>),
 }
@@ -220,6 +225,7 @@ impl Tooltip {
                
                 
             }
+            #[cfg(target_os = "linux")]
             Message::RetIdPipewire => {
                 return Task::perform(
                     pipewirerec(),
@@ -433,6 +439,7 @@ fn position_to_text<'a>(position: Position) -> &'a str {
         Position::Right => "Right",
     }
 }
+#[cfg(target_os = "linux")]
 async fn pipewirerec() -> Result<u32,u32>{
     let proxy = Screencast::new().await.expect("couln not start screencast proxi");
     let mut valnode: u32 = 0;

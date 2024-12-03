@@ -97,7 +97,7 @@ impl ScreenStreamer {
         #[cfg(target_os = "macos")]
         let videosrc = gst::ElementFactory::make("avfvideosrc")
             .property("capture-screen", true)
-            .property("device-index", &extra)
+           // .property("device-index", &extra)
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
@@ -292,7 +292,7 @@ impl ScreenStreamer {
         #[cfg(target_os = "macos")]
         let videosrc = gst::ElementFactory::make("avfvideosrc")
             .property("capture-screen", true)
-            .property("device-index", &device_index)
+          //  .property("device-index", &device_index)
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
