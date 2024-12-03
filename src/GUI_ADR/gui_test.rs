@@ -430,15 +430,6 @@ impl Tooltip {
     }
 }
 
-fn position_to_text<'a>(position: Position) -> &'a str {
-    match position {
-        Position::FollowCursor => "Follow Cursor",
-        Position::Top => "Top",
-        Position::Bottom => "Bottom",
-        Position::Left => "Left",
-        Position::Right => "Right",
-    }
-}
 #[cfg(target_os = "linux")]
 async fn pipewirerec() -> Result<u32,u32>{
     let proxy = Screencast::new().await.expect("couln not start screencast proxi");
