@@ -1,13 +1,19 @@
-use clap::error;
+use clap::{error};
+use iced::widget::canvas::{Frame, Geometry, Program};
 use iced::widget::tooltip::Position;
-use iced::widget::{button, center, container, tooltip};
-use iced::Element;
+use iced::widget::{self, button, center, container, tooltip, Canvas, image};
+use iced::window::Id;
+use iced::{
+    touch::Event::FingerMoved,
+    event::{self, Event, Status}, 
+    mouse::{self, Event::{ButtonPressed, ButtonReleased, CursorMoved}},
+     Element, Point, Rectangle, Renderer, Theme};
 use iced::widget::{
      checkbox, column, horizontal_space, radio, row,
     scrollable, slider, text, text_input, toggler, vertical_space
 };
 use iced::widget::{Button, Column, Container, Slider,Text};
-use iced::{Center, Color, Fill, Font, Pixels,Subscription};
+use iced::{window, Center, Color, ContentFit, Fill, Font, Length, Pixels, Subscription};
 use iced::{Task};
 
 #[cfg(target_os = "linux")]
@@ -22,6 +28,7 @@ use ashpd::{
 
 use display_info::DisplayInfo;
 
+use screenshots::Screen;
 #[cfg(target_os = "linux")]
 use zbus::fdo::Error;
 
@@ -35,10 +42,12 @@ use crate::StreamerState;
 
 
 pub fn run_iced() -> iced::Result {
-    iced::run("Tooltip - Iced", Tooltip::update, Tooltip::view)
+    iced::application("Ferris - Iced", Tooltip::update, Tooltip::view)
+        .subscription(Tooltip::subscription)
+        .theme(|_| Theme::TokyoNight)
+        .run()
 }
 
-#[derive(Default)]
 struct Tooltip {
     position: Position,
     user_type:  UserType,
@@ -48,7 +57,33 @@ struct Tooltip {
     streamer_client: Option<StreamerClient>,
     streamer_state: Option<StreamerState>,
     valnode:u32,
+    mouse_point: Point,
+    first_point: Option<Point>,
+    second_point: Option<Point>,
+    is_selecting_area: bool,
+    window_id: window::Id,
 }
+
+impl Default for Tooltip {
+    fn default() -> Self {
+        Self{
+            position: Position::Top,
+            user_type: UserType::None,
+            input_value_streamer: "".to_string(),
+            input_value_client: "".to_string(),
+            ips: "".to_string(),
+            streamer_client: None,
+            streamer_state: None,
+            valnode: 0,
+            mouse_point: Point::ORIGIN,
+            first_point: None,
+            second_point: None,
+            is_selecting_area: false,
+            window_id: window::Id::unique(),
+        }
+    }
+}
+
 #[derive(Default,Debug)]
 enum UserType{  // sposta in main qunado è ora, di default è clioent
     
@@ -71,6 +106,12 @@ enum Message {
     #[cfg(target_os = "linux")]
     RetIdPipewire,
     GotValNode(Result<u32,u32>),
+    PointUpdated(Point),
+    FirstPoint,
+    SecondPoint,
+    ToggleSelectingArea,
+    TakeScreenshot,
+    SetSelectingArea,
 }
 
 impl Tooltip {
@@ -111,7 +152,7 @@ impl Tooltip {
 
 
             Message::StopClientPressed => {
-                if let Some(mut player) = self.streamer_client.take() {
+                if let Some(player) = self.streamer_client.take() {
                     std::thread::spawn(move || {
                         crate::stop_client(player).unwrap(); // Handle error appropriately
                     });
@@ -261,9 +302,68 @@ impl Tooltip {
             }
             Message::InputChangedClient(input_value) => {
                 self.input_value_client = input_value;
+            },
+            Message::PointUpdated(p) => {
+                self.mouse_point = p
+            },
+            Message::FirstPoint => {
+                self.first_point = Some(self.mouse_point)
+            },
+            Message::SecondPoint => {
+                self.second_point = Some(self.mouse_point);
+                println!("New Points saved: {}, {}", self.first_point.unwrap(), self.second_point.unwrap());
+                self.is_selecting_area = false;
+            },
+            Message::ToggleSelectingArea => {
+                return Task::batch(vec![
+                    Task::perform(async {}, |_| Message::TakeScreenshot), // Esegue un'operazione vuota (opzionale)
+                    window::change_mode(self.window_id, window::Mode::Fullscreen),   // Metti a schermo intero
+                    Task::perform(async { true }, |_| Message::SetSelectingArea),
+                ]);
+
+
+            },
+            Message::TakeScreenshot => {
+                let screens = Screen::all().unwrap();
+    
+                for screen in screens {
+                    println!("capturer {screen:?}");
+                    let image = screen.capture().unwrap();
+                    image
+                        .save(format!("target/{}.png", screen.display_info.id))
+                        .unwrap();
+
+                }
             }
+            Message::SetSelectingArea => {
+                self.first_point = None;
+                self.second_point = None;
+                self.is_selecting_area = true;
+            }
+
         }
         Task::none()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        if self.is_selecting_area {
+            event::listen_with(|event, status, _queue| match (event, status) {
+                (Event::Mouse(CursorMoved { position }), Status::Ignored)
+                | (Event::Touch(FingerMoved { position, .. }), Status::Ignored) => {
+                    Some(Message::PointUpdated(position))
+                }
+                (Event::Mouse(ButtonPressed(_)), Status::Ignored) => {
+                    Some(Message::FirstPoint)
+                }
+                (Event::Mouse(ButtonReleased(_)), Status::Ignored) => {
+                    Some(Message::SecondPoint)
+                }
+                _ => None,
+            })
+        }
+        else{
+            iced::Subscription::none()
+        }
     }
 
     fn view(&self) -> Element<Message> {
@@ -275,14 +375,16 @@ impl Tooltip {
         )
         .gap(10)
         .style(container::rounded_box);*/
+
+    if !self.is_selecting_area {
         let value_client = &self.input_value_client;
         let value_streamer = &self.input_value_streamer;
 
-        let mut text_input_streamer = text_input("es.. 0", &value_streamer)
+        let text_input_streamer = text_input("es.. 0", &value_streamer)
         .on_input(Message::InputChangedStreamer)
         .padding(10)
         .size(30);
-        let mut text_input_client = text_input("es.. 198.154.1.12", &value_client)
+        let text_input_client = text_input("es.. 198.154.1.12", &value_client)
         .on_input(Message::InputChangedClient)
         .padding(10)
         .size(30); 
@@ -362,10 +464,12 @@ impl Tooltip {
 
        };
 
+       let selecting_area_button = button("Select the area to stream")
+       .on_press(Message::ToggleSelectingArea);
 
 
 
-        let content: Element<_> = column![ controls,]
+        let content: Element<_> = column![ controls, selecting_area_button]
             //.max_width(540)
             .spacing(20)
             .padding(20)
@@ -384,6 +488,41 @@ impl Tooltip {
         
         center(content).into()
     }
+    else {
+
+        let column = column![
+            Element::from(
+                image("target/1.png")
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .content_fit(ContentFit::Cover)
+            )
+        ];
+
+        let over_text = text("Choose the area to stream")
+        .color(Color::WHITE);
+
+        let my_canvas =
+            Canvas::new(MyCanvas{first_point:self.first_point,
+                second_point:self.mouse_point})
+                .width(Length::Fill)
+                .height(Length::Fill);
+
+        let my_stack = widget::Stack::new()
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .push(column)
+        .push(over_text)
+        .push(my_canvas);
+        
+        let my_container = container(my_stack)
+        .width(Length::Fill)
+        .height(Length::Fill);
+                
+        return my_container.into();
+           
+    }
+}
 
 
 
@@ -427,6 +566,43 @@ impl Tooltip {
 
     fn container(title: &str) -> Column<'_, Message> {
         column![text(title).size(50)].spacing(20)
+    }
+}
+
+
+
+struct MyCanvas{
+    first_point: Option<Point>,
+    second_point: Point,
+}
+
+impl<Message> Program<Message> for MyCanvas {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &Self::State,
+        renderer: &Renderer,
+        _theme: &Theme, 
+        bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> Vec<Geometry> {
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        match self.first_point {
+            Some(point) => {
+                let canvas_size = iced::Size::new(
+                    self.second_point.x - self.first_point.unwrap().x,
+                     self.second_point.y - self.first_point.unwrap().y);
+                frame.fill_rectangle(point,
+                     canvas_size, 
+                     Color::from_rgba(0.0, 0.2, 0.4, 0.5));
+            },
+            None => (),
+        }
+       
+
+        vec![frame.into_geometry()]
     }
 }
 
