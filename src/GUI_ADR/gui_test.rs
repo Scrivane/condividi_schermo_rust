@@ -159,7 +159,7 @@ impl Tooltip {
                 }
                 self.user_type = UserType::None;
 
-                println!("ho finot lo stream {:?}",&self.user_type);
+                println!("ho finito lo stream {:?}",&self.user_type);
             }
             Message::StreamerPressed => {
                 self.user_type = UserType::streamer;
@@ -330,7 +330,7 @@ impl Tooltip {
                     println!("capturer {screen:?}");
                     let image = screen.capture().unwrap();
                     image
-                        .save(format!("target/{}.png", screen.display_info.id))
+                        .save("target/screen_preview.png")
                         .unwrap();
 
                 }
@@ -492,7 +492,7 @@ impl Tooltip {
 
         let column = column![
             Element::from(
-                image("target/1.png")
+                image("target/screen_preview.png")
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .content_fit(ContentFit::Cover)
