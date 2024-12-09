@@ -1,7 +1,10 @@
 use clap::{error};
+use iced::daemon::DefaultStyle;
+use iced::theme::palette::Background;
 use iced::widget::canvas::{Frame, Geometry, Program};
 use iced::widget::tooltip::Position;
 use iced::widget::{self, button, center, container, tooltip, Canvas, image};
+
 use iced::window::Id;
 use iced::{
     touch::Event::FingerMoved,
@@ -13,8 +16,9 @@ use iced::widget::{
     scrollable, slider, text, text_input, toggler, vertical_space
 };
 use iced::widget::{Button, Column, Container, Slider,Text};
-use iced::{window, Center, Color, ContentFit, Fill, Font, Length, Pixels, Subscription};
+use iced::{border, window, Center, Color, ContentFit, Fill, Font, Length, Pixels, Subscription};
 use iced::{Task};
+use iced::Border;
 
 #[cfg(target_os = "linux")]
 use ashpd::{
@@ -28,6 +32,7 @@ use ashpd::{
 
 use display_info::DisplayInfo;
 
+use repng::meta::palette;
 use screenshots::Screen;
 #[cfg(target_os = "linux")]
 use zbus::fdo::Error;
@@ -39,12 +44,12 @@ use get_if_addrs::get_if_addrs;
 use crate::streamer::client::StreamerClient;
 use crate::StreamerState;
 
-
+use iced::application;
 
 pub fn run_iced() -> iced::Result {
     iced::application("Ferris - Iced", Tooltip::update, Tooltip::view)
-        .subscription(Tooltip::subscription)
-        .theme(|_| Theme::TokyoNight)
+        .style(Tooltip::style).subscription(Tooltip::subscription).transparent(true)
+        .theme(|_| Theme::TokyoNight)//.transparent(true)
         .run()
 }
 
@@ -324,7 +329,7 @@ impl Tooltip {
 
             },
             Message::TakeScreenshot => {
-                let screens = Screen::all().unwrap();
+                /* let screens = Screen::all().unwrap();
     
                 for screen in screens {
                     println!("capturer {screen:?}");
@@ -333,7 +338,7 @@ impl Tooltip {
                         .save("target/screen_preview.png")
                         .unwrap();
 
-                }
+                } */
             }
             Message::SetSelectingArea => {
                 self.first_point = None;
@@ -490,17 +495,21 @@ impl Tooltip {
     }
     else {
 
+        #[cfg(target_os = "macos")]
         let column = column![
-            Element::from(
+            
                 image("target/screen_preview.png")
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .content_fit(ContentFit::Cover)
-            )
-        ];
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .content_fit(ContentFit::Cover)
+         ];
+        #[cfg(not(target_os = "macos"))]
+        let column = column![];
+        
+
 
         let over_text = text("Choose the area to stream")
-        .color(Color::WHITE);
+        .color(Color::from_rgb(3.0, 0.0, 0.0));  //mettere uno sfonte oltro al testo senno non è carino  
 
         let my_canvas =
             Canvas::new(MyCanvas{first_point:self.first_point,
@@ -517,13 +526,56 @@ impl Tooltip {
         
         let my_container = container(my_stack)
         .width(Length::Fill)
-        .height(Length::Fill);
+        .height(Length::Fill).style(|theme| {
+            let palette = theme.extended_palette();
+
+            container::Style::default()
+                .border(border::color(palette.background.strong.color).width(4))
+        })
+        .padding(4);
+
+        //.the(Background::new(Color::TRANSPARENT, Color::WHITE));
                 
         return my_container.into();
            
     }
+
+
+
+
+
+
+
+
+    
 }
 
+
+
+
+fn style(&self, theme: &Theme) -> application::Appearance {
+    use application::DefaultStyle;
+
+        if self.is_selecting_area {
+            application::Appearance {
+                background_color: Color::TRANSPARENT,
+                text_color: theme.palette().text,
+
+             
+            }
+
+    
+            
+        }
+        else {
+            Theme::default_style(theme)
+            
+        }
+    
+        
+        
+   
+}
 
 
     fn can_continue_streamer(&self) -> bool {  //trafrorma in enum cosi da gestire monitor non inserito , monitor sbagliiato o buono
