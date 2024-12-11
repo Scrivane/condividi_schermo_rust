@@ -139,6 +139,18 @@ impl StreamerClient {
         })
     }
 
+
+    pub fn get_is_rec(&self)-> bool{
+
+        let is_recording = self.is_recording.lock().unwrap();
+        if *is_recording {
+            return true;
+        }
+        return  false;
+
+        
+    }
+
     pub fn start_streaming(&mut self) -> Result<(), ClientError> {
         if let Some(ref pipeline) = self.pipeline {
             pipeline.set_state(State::Playing)
