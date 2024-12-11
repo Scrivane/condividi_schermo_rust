@@ -157,17 +157,7 @@ impl Tooltip {
             }
             Message::StartRecording => {
                 
-                let  usertype=&self.user_type ;
-           
-                let ip:IpAddr=self.input_value_client.clone().trim().parse::<IpAddr>().unwrap();
-                let client_handle = std::thread::spawn(move || {
-                    crate::start_client(ip).unwrap() // in futuro maneggia errori
-                });
-
-                if let Ok(client) = client_handle.join() {
-                    self.streamer_client = Some(client);
-                }
-
+          
                 println!("{:?}",&self.user_type);
 
 
