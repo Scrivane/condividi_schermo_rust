@@ -117,6 +117,7 @@ enum Message {
     ToggleSelectingArea,
     TakeScreenshot,
     SetSelectingArea,
+    StartRecording
 }
 
 impl Tooltip {
@@ -154,9 +155,47 @@ impl Tooltip {
                     println!("{:?}",&self.user_type);
        
             }
+            Message::StartRecording => {
+                
+                let  usertype=&self.user_type ;
+           
+                let ip:IpAddr=self.input_value_client.clone().trim().parse::<IpAddr>().unwrap();
+                let client_handle = std::thread::spawn(move || {
+                    crate::start_client(ip).unwrap() // in futuro maneggia errori
+                });
+
+                if let Ok(client) = client_handle.join() {
+                    self.streamer_client = Some(client);
+                }
+
+                println!("{:?}",&self.user_type);
+
+
+                match self.streamer_client  {
+                    None => println!("failed! No client was started before clicking on recording "),
+                    Some(ref mut client) => {
+                        client.start_recording();
+                        //println!("{} / {} = {}", dividend, divisor, quotient)
+                    },
+                    
+                }
+
+
+
+   
+        }
 
 
             Message::StopClientPressed => {
+                if let Some(player) = self.streamer_client.take() {
+
+                    
+                    std::thread::spawn(move || {
+                       
+                        
+                        crate::stop_client(player).unwrap(); // Handle error appropriately
+                    });
+                }
                 if let Some(player) = self.streamer_client.take() {
                     std::thread::spawn(move || {
                         crate::stop_client(player).unwrap(); // Handle error appropriately
@@ -447,8 +486,10 @@ impl Tooltip {
   .push(
       "Currently receiving screencast",
   ).push(padded_button("End client")
-  .on_press(Message::StopClientPressed)   
-);
+  .on_press(Message::StopClientPressed))  
+  .push(padded_button("start recording")
+  .on_press(Message::StartRecording)   );
+
   //.push(padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed));;
 
   

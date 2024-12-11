@@ -360,7 +360,7 @@ fn start_client(ip_addr: IpAddr) -> Result<StreamerClient, Box<dyn Error>> {
 #[cfg(feature = "icedf")]
 fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
     
-        //player.stop_recording()?;
+    player.stop_recording()?;
     player.stop_streaming();
 
     Ok(())
