@@ -359,6 +359,9 @@ fn start_client(ip_addr: IpAddr) -> Result<StreamerClient, Box<dyn Error>> {
 
 #[cfg(feature = "icedf")]
 fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
+
+
+    // andrebbe meso costrutto di sincronizzazione per evitare che cambi lo stato durante le successive istruzuini 
     match player.get_is_rec() {
         true => player.stop_recording()?,
         false => println!("It's not recording , we can end the stream "),
