@@ -1,6 +1,7 @@
 use gst::prelude::*;
+use rfd::FileDialog;
 use gst::{ClockTime, Element, Pipeline, State};
-use std::{thread, fmt};
+use std::{fmt, path, thread};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 #[cfg(target_os = "macos")]
@@ -232,6 +233,33 @@ impl StreamerClient {
 
 
 
+
+        let file_path = FileDialog::new()
+        .set_title("Choose where to save the video")
+        .set_file_name("output_video.flv")
+        .add_filter("FLV Video", &["flv"]) // Allow only `.flv` extensions
+        .save_file();
+
+         let path_str = match file_path {
+                Some(path) => path.to_str().ok_or(ClientError {
+                    message: "Invalid file path".to_string()})?
+                    .to_string(), 
+                None => "output_video.flv".to_string(), // Default file name
+            };
+
+      /*   if let Some(path) = file_path {
+            let path_str = path.to_str().ok_or(ClientError {
+                message: "Invalid file path".to_string(),
+            })?;
+            self.start_recording(path_str)
+        } else {
+            Err(ClientError {
+                message: "No file path selected".to_string(),
+            })
+        }
+ */
+
+
         if let Some(ref pipeline) = self.pipeline {
             if let Some(ref tee) = self.tee {
 
@@ -250,7 +278,7 @@ impl StreamerClient {
                     message: "Failed to create flvmux".to_string(),
                 })?;
                 let filesink = gst::ElementFactory::make("filesink")
-                    .property("location", "video_test.flv")
+                    .property("location", path_str)
                     .build()
                     .map_err(|_| ClientError {
                         message: "Failed to create filesink".to_string(),
