@@ -117,7 +117,8 @@ enum Message {
     ToggleSelectingArea,
     TakeScreenshot,
     SetSelectingArea,
-    StartRecording
+    StartRecording,
+    StopRec
 }
 
 impl Tooltip {
@@ -158,7 +159,7 @@ impl Tooltip {
             Message::StartRecording => {
                 
           
-                println!("{:?}",&self.user_type);
+                println!("Starting recording {:?}",&self.user_type);
 
 
                 match self.streamer_client  {
@@ -170,10 +171,27 @@ impl Tooltip {
                     
                 }
 
-
-
    
         }
+
+
+        Message::StopRec => {
+                
+          
+            println!("Stop recording {:?}",&self.user_type);
+
+
+            match self.streamer_client  {
+                None => println!("failed! No client was started before clicking on stop recording "),
+                Some(ref mut client) => {
+                    client.stop_recording();
+              
+                },
+                
+            }
+
+
+    }
 
 
             Message::StopClientPressed => {
@@ -472,13 +490,36 @@ impl Tooltip {
     
     );
 
-  let client_section_started = Self::container("Client")
+  let mut client_section_started = Self::container("Client")
   .push(
       "Currently receiving screencast",
   ).push(padded_button("End client")
-  .on_press(Message::StopClientPressed))  
-  .push(padded_button("start recording")
-  .on_press(Message::StartRecording)   );
+  .on_press(Message::StopClientPressed))  ;
+  
+  
+  
+  /*.push(padded_button("start recording")
+  .on_press(Message::StartRecording)   );  */
+
+  if self
+  .streamer_client
+  .as_ref()
+  .map_or_else(|| false, |client| client.get_is_rec()) ==false
+{
+    client_section_started=client_section_started.push(
+      padded_button("start recording").on_press(Message::StartRecording),
+  );
+} else {
+    client_section_started=client_section_started.push(
+      padded_button("stop recording").on_press(Message::StopRec),
+  );
+}
+
+
+
+
+
+
 
   //.push(padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed));;
 

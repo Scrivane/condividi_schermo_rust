@@ -296,7 +296,7 @@ impl StreamerClient {
         Ok(())
     }
     // Funzione per fermare la registrazione
-    pub fn stop_recording(&mut self) -> Result<(), ClientError> {
+    pub fn stop_recording(&mut self) -> Result<(), ClientError> {   //adrebbe fattp in modo che si faccia anche unlink di cio che stavamo registrando
         let mut is_recording = self.is_recording.lock().unwrap();
         if !*is_recording {
             return Err(ClientError {
@@ -304,6 +304,7 @@ impl StreamerClient {
             });
         }
         println!("Stop recording");
+        *is_recording = false;
 
 
         Ok(())
