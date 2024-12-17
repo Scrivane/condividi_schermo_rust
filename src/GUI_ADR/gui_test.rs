@@ -6,7 +6,7 @@ use iced::theme::palette::Background;
 use iced::widget::canvas::{Frame, Geometry, Program};
 use iced::widget::tooltip::Position;
 use iced::widget::{self, button, center, container, tooltip, Canvas, image};
-
+use std::{thread, time::Duration};
 use iced::window::Id;
 use iced::{
     touch::Event::FingerMoved,
@@ -128,6 +128,7 @@ enum Message {
     StartRecording,
     StopRec,
     ChangeApplicationState(ApplicationState),
+    SetBlankScreen,
     #[cfg(target_os = "linux")]
     RetIdPipewire,
 
@@ -259,15 +260,29 @@ impl ScreenSharer {
                 );
             }
             Message::StopStreamerPressed => {
-                if let Some(state) = self.streamer_state.take() {
-                    std::thread::spawn(move || {
-                        crate::stop_streamer(state).expect("Failed to stop streamer");
-                    });
-                    println!("Streamer stopped.");
-                    self.user_type = UserType::None;
-                } else {
-                    println!("No active streamer to stop.");
+
+                let  state =self.streamer_state.as_ref().unwrap();
+                let arcStreamerState =state.streamer_arc.lock();
+                let resImgStream=arcStreamerState.expect("errore frov").share_static_image_end("end_stream_ai.png".to_string());
+                match resImgStream {
+                    Ok(())=> { println!("Streaming end stream image");
+                    if let Some(state) = self.streamer_state.take() {
+                        std::thread::spawn(move || {
+
+                            thread::sleep(Duration::from_millis(40000));
+                            crate::stop_streamer(state).expect("Failed to stop streamer");
+                        });
+                        println!("Streamer stopped.");
+                        self.user_type = UserType::None;
+                    } else {
+                        println!("No active streamer to stop.");
+                    }
+                    
+                },
+                    Err(ServerError)=> println!("Server error while streaming static image"),
+                    
                 }
+                
             }
             Message::InputChangedStreamer(input_value) => {
                 self.input_value_streamer = input_value;
@@ -299,8 +314,14 @@ impl ScreenSharer {
             },
             Message::ChangeApplicationState(state) => {
                 self.application_state = state;
-            }
+            },
 
+            Message::SetBlankScreen => {
+
+                let  state =self.streamer_state.as_ref().unwrap();
+                    let arcStreamerState =state.streamer_arc.lock();
+                    let streamres=arcStreamerState.expect("errore frov").share_static_image_end("blank.png".to_string());
+            },
         }
         Task::none()
     }
@@ -404,7 +425,9 @@ impl ScreenSharer {
               let stremer_section_started =  Self::container("Streamer")
               .push(
                   "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )",
-              ).push(Text::new(&self.ips)).push(padded_button("End Stream")
+              ).push(Text::new(&self.ips)).push(padded_button("Blank the streamed screen")
+              .on_press(Message::SetBlankScreen) )
+              .push(padded_button("End Stream")
               .on_press(Message::StopStreamerPressed) 
             
             );

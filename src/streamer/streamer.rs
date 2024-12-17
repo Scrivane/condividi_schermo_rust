@@ -2,9 +2,11 @@ use std::sync::{Arc, Mutex};
 use gst::prelude::*;
 use gst::{Pipeline, State};
 use cfg_if::cfg_if;
+use iced::widget::shader::wgpu::naga::Range;
 use crate::streamer::error::ServerError;
 use iced::futures;
 use iced::Subscription;
+use std::time::{Instant, Duration};
 
 #[cfg(target_os = "linux")]
 use ashpd::{
@@ -45,7 +47,6 @@ impl ScreenStreamer {
         };
 
         let pipeline = Self::create_pipeline2(capture_region, extrainfo).expect("errore creazioen pipeline screenstremer");
-
 
         let bus = pipeline.bus().unwrap();
         let pipeline_clone = pipeline.clone();
@@ -597,4 +598,55 @@ impl ScreenStreamer {
             }
         }
     }
+
+
+
+
+
+    pub fn share_static_image_end(&mut self,imagename: String) -> Result<(), ServerError> {
+        if let Some(ref oldpipeline) = self.pipeline {
+            oldpipeline.set_state(gst::State::Null).map_err(|e| ServerError {
+                message: format!("Failed to set old pipeline state to null"),
+            })?;
+        
+        }
+
+        let image_path="src/images/".to_string()+imagename.trim();
+        //   grande.png";
+        //let oldpipeline=self.pipeline.expect("no pipeline old")
+       
+        let clients = self.clients.lock().unwrap();
+        let addresses: Vec<String> = clients.iter().map(|addr| addr.to_string()).collect();
+        let addresses_str = addresses.join(",");
+
+        let pipeline_description = format!(r#"
+        multifilesrc location={} loop=true !
+        pngdec !
+        videorate !
+        video/x-raw,framerate=30/1 !
+        videoconvert !
+        x264enc !
+        rtph264pay !
+        multiudpsink name=multiudpsink clients={}
+    "#, &image_path,&addresses_str
+);
+
+
+let pipeline = gst::parse::launch(pipeline_description.as_str()).expect("Failed to parse pipeline to gst::parse");
+// Start playing the pipeline
+let new_pipeline = pipeline.dynamic_cast::<gst::Pipeline>().expect("Failed to cast pipeline to gst::Pipeline");
+
+
+    new_pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline of static image to Playing ".to_string());
+
+        self.pipeline = Some(new_pipeline);
+        self.is_streaming = true;
+
+
+    
+            Ok({})
+        
+    }
+        
+ 
 }
