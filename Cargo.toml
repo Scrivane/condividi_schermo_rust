@@ -25,7 +25,7 @@ socket2 = "0.5.7"
 display-info = "0.5.1"
 iced = { version = "0.13.1", features = ["canvas", "image"] }
 get_if_addrs = "0.5.3"
-screenshots = "0.8.3"
+screenshots = "0.8.10"
 rfd = "0.15.1"
 
 

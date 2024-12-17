@@ -1,11 +1,11 @@
 use selector_draw::MyCanvas;
-
+use display::Display;
 use clap::{error};
 use iced::daemon::DefaultStyle;
 use iced::theme::palette::Background;
 use iced::widget::canvas::{Frame, Geometry, Program};
 use iced::widget::tooltip::Position;
-use iced::widget::{self, button, center, container, tooltip, Canvas, image};
+use iced::widget::{self, button, center, container, image, pick_list, tooltip, Canvas};
 
 use iced::window::Id;
 use iced::{
@@ -48,7 +48,7 @@ use crate::StreamerState;
 
 use iced::application;
 
-use super::selector_draw;
+use super::{display, selector_draw};
 
 pub fn run_iced() -> iced::Result {
     iced::application("Ferris - Iced", ScreenSharer::update, ScreenSharer::view)
@@ -78,11 +78,24 @@ struct ScreenSharer {
     second_point: Option<Point>,
     is_selecting_area: bool,
     window_id: window::Id,
-    application_state: ApplicationState
+    application_state: ApplicationState,
+    available_display: Vec<Display>,
+    selected_screen: Option<Display>,
 }
 
 impl Default for ScreenSharer {
     fn default() -> Self {
+
+        let screen = Screen::all().unwrap();
+        let displays: Vec<Display> = screen
+        .iter()
+        .map(|screen| Display{
+            id: screen.display_info.id,
+            width: screen.display_info.width,
+            height: screen.display_info.height,
+            frequency: screen.display_info.frequency
+        }).collect();
+
         Self{
             position: Position::Top,
             user_type: UserType::None,
@@ -98,6 +111,8 @@ impl Default for ScreenSharer {
             is_selecting_area: false,
             window_id: window::Id::unique(),
             application_state: ApplicationState::Start,
+            available_display: displays,
+            selected_screen: None,
         }
     }
 }
@@ -117,7 +132,6 @@ enum Message {
     ClientPressed,
     StopStreamerPressed,
     StopClientPressed,
-    InputChangedStreamer(String),
     InputChangedClient(String),
     GotValNode(Result<u32,u32>),
     PointUpdated(Point),
@@ -128,9 +142,9 @@ enum Message {
     StartRecording,
     StopRec,
     ChangeApplicationState(ApplicationState),
+    ChangeSelectedScreen(Display),
     #[cfg(target_os = "linux")]
     RetIdPipewire,
-
 }
 
 impl ScreenSharer {
@@ -140,6 +154,9 @@ impl ScreenSharer {
 
 
         match message {
+            Message::ChangeSelectedScreen(display) => {
+                self.selected_screen = Some(display);
+            },
             Message::ClientPressed => {
                     self.user_type = UserType::client;
                
@@ -208,7 +225,7 @@ impl ScreenSharer {
             }
             Message::StreamerPressed => {
                 self.user_type = UserType::streamer;
-                let id_screen: usize = self.input_value_streamer.clone().trim().parse().unwrap();
+                let id_screen: usize = self.selected_screen.unwrap().id as usize;
          
                 match get_if_addrs() {
                     Ok(interfaces) => {
@@ -268,10 +285,7 @@ impl ScreenSharer {
                 } else {
                     println!("No active streamer to stop.");
                 }
-            }
-            Message::InputChangedStreamer(input_value) => {
-                self.input_value_streamer = input_value;
-            }
+            },
             Message::InputChangedClient(input_value) => {
                 self.input_value_client = input_value;
             },
@@ -349,58 +363,63 @@ impl ScreenSharer {
 
                 return final_column.into();
             },
-           _ => {
-            if !self.is_selecting_area {
+            ApplicationState::Client => {
                 let value_client = &self.input_value_client;
-                let value_streamer = &self.input_value_streamer;
-        
-                let text_input_streamer = text_input("es.. 0", &value_streamer)
-                .on_input(Message::InputChangedStreamer)
-                .padding(10)
-                .size(30);
+
                 let text_input_client = text_input("es.. 198.154.1.12", &value_client)
                 .on_input(Message::InputChangedClient)
                 .padding(10)
                 .size(30); 
-            cfg_if! {
-                if #[cfg(target_os = "linux")] {
-                let start_button =padded_button("Start sharing screen").on_press(Message::RetIdPipewire);
-                    } else {
-                let start_button =padded_button("Start sharing screen").on_press(Message::StreamerPressed);
-                    }
+
+                let client_section=column![]
+                .push("Write the ip adress of the sharer").push(text_input_client)
+                .push_maybe(self.can_continue_client().then(|| {
+                    padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed)
+                    })).push_maybe( (!self.can_continue_client()).then(|| {
+                        "Invalid ip, try to insert an other one "
+                    }));
+                
+
+                let mut client_section_started = Self::container("Client")
+                .push(
+                    "Currently receiving screencast",
+                ).push(padded_button("End client")
+                .on_press(Message::StopClientPressed));
+                    if self
+                .streamer_client
+                .as_ref()
+                .map_or_else(|| false, |client| client.get_is_rec()) ==false
+                {
+                    client_section_started=client_section_started.push(
+                    padded_button("start recording").on_press(Message::StartRecording),
+                );
+                } else {
+                    client_section_started=client_section_started.push(
+                    padded_button("stop recording").on_press(Message::StopRec),
+                );
                 }
+                let content = row![]
+                .push(client_section);
+
+                return content.into();
+            },
+            ApplicationState::Streamer => {
+            if !self.is_selecting_area {
+                let screens_list = pick_list(self.available_display.clone(),
+                        self.selected_screen,
+                    Message::ChangeSelectedScreen)
+                    .width(500)
+                    .padding(30)
+                    .placeholder("Choose the screen to stream");
+        
                 
-        
-        
-              let streamer_section=column![]
-              
-             // .push(padded_button("Start sharing screen").on_press(Message::StreamerPressed))
-              .push("Write the id of the screen you want to stream from")
-              .push(text_input_streamer)
-        
-              .push_maybe(self.can_continue_streamer().then(|| {
-                start_button
-        
-            
-                //on_press(Message::RetIdPipewire)
-                
-               // on_press(Message::StreamerPressed)
-            })).push_maybe( (!self.can_continue_streamer()).then(|| {
-                "Invalid screen id, try to insert again "
-            }));    //rendi più carino
-              
-              
-        
-              let client_section=column![]
-              .push("Write the ip adress of the sharer").push(text_input_client)
-              .push_maybe(self.can_continue_client().then(|| {
-                padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed)
-            })).push_maybe( (!self.can_continue_client()).then(|| {
-                "Invalid ip, try to insert an other one "
-            }));
-        
-        
-        
+                cfg_if! {
+                    if #[cfg(target_os = "linux")] {
+                    let start_button =padded_button("Start sharing screen").on_press(Message::RetIdPipewire);
+                        } else {
+                    let start_button =padded_button("Start sharing screen").on_press(Message::StreamerPressed);
+                        }
+                    }
               let stremer_section_started =  Self::container("Streamer")
               .push(
                   "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )",
@@ -409,90 +428,19 @@ impl ScreenSharer {
             
             );
         
-          let mut client_section_started = Self::container("Client")
-          .push(
-              "Currently receiving screencast",
-          ).push(padded_button("End client")
-          .on_press(Message::StopClientPressed))  ;
-          
-          
-          
-          /*.push(padded_button("start recording")
-          .on_press(Message::StartRecording)   );  */
-        
-          if self
-          .streamer_client
-          .as_ref()
-          .map_or_else(|| false, |client| client.get_is_rec()) ==false
-        {
-            client_section_started=client_section_started.push(
-              padded_button("start recording").on_press(Message::StartRecording),
-          );
-        } else {
-            client_section_started=client_section_started.push(
-              padded_button("stop recording").on_press(Message::StopRec),
-          );
-        }
-        
-          //.push(padded_button("Connect to a screen sharing session").on_press(Message::ClientPressed));;
-        
-          
-        
-        
-           
-               let controls:iced::widget::Row<'_, Message>=match self.user_type {
-                UserType::None=>  {row![]
-                .push(streamer_section)
-                .push(horizontal_space())  //togli 2
-                .push(client_section)}
-              UserType::client=>  {row![]
-                .push(client_section_started)}
-                //.push(horizontal_space())
-               // .push( clientSection) }
-              UserType::streamer=> {row![]
-                .push(stremer_section_started)}
-        
-               };
-        
                let selecting_area_button = button("Select the area to stream")
                .on_press(Message::ToggleSelectingArea);
         
-        
-        
-                let content: Element<_> = column![ controls, selecting_area_button]
+                let content: Element<_> = column![stremer_section_started, screens_list, selecting_area_button, start_button]
                     //.max_width(540)
                     .spacing(20)
                     .padding(20)
-                    .into();
-        
-                /*let scrollable = scrollable(
-                        container(
-                            content
-                        )
-                        .center_x(Fill),
-                    );
-        
-                */
-        
-        
-                
+                    .into();                
                 center(content).into()
             }
             else {
         
-                #[cfg(target_os = "macos")]
-                let column = column![
-                    
-                        image("target/screen_preview.png")
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .content_fit(ContentFit::Cover)
-                 ];
-                #[cfg(not(target_os = "macos"))]
-                let column = column![];
-                
-        
-        
+                let column = column![];        
                 let over_text = text("Choose the area to stream")
                 .color(Color::from_rgb(3.0, 0.0, 0.0));  //mettere uno sfonte oltro al testo senno non è carino  
         
