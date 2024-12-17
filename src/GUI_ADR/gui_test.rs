@@ -5,13 +5,8 @@ use iced::daemon::DefaultStyle;
 use iced::theme::palette::Background;
 use iced::widget::canvas::{Frame, Geometry, Program};
 use iced::widget::tooltip::Position;
-<<<<<<< HEAD
 use iced::widget::{self, button, center, container, image, pick_list, tooltip, Canvas};
-
-=======
-use iced::widget::{self, button, center, container, tooltip, Canvas, image};
 use std::{thread, time::Duration};
->>>>>>> aed13050ba7a975f65ce504b01ecd92bd1b476cc
 use iced::window::Id;
 use iced::{
     touch::Event::FingerMoved,
@@ -147,11 +142,8 @@ enum Message {
     StartRecording,
     StopRec,
     ChangeApplicationState(ApplicationState),
-<<<<<<< HEAD
     ChangeSelectedScreen(Display),
-=======
     SetBlankScreen,
->>>>>>> aed13050ba7a975f65ce504b01ecd92bd1b476cc
     #[cfg(target_os = "linux")]
     RetIdPipewire,
 }
@@ -307,15 +299,7 @@ impl ScreenSharer {
                     Err(ServerError)=> println!("Server error while streaming static image"),
                     
                 }
-<<<<<<< HEAD
             },
-=======
-                
-            }
-            Message::InputChangedStreamer(input_value) => {
-                self.input_value_streamer = input_value;
-            }
->>>>>>> aed13050ba7a975f65ce504b01ecd92bd1b476cc
             Message::InputChangedClient(input_value) => {
                 self.input_value_client = input_value;
             },
@@ -397,7 +381,11 @@ impl ScreenSharer {
                 .spacing(10)
                 .align_x(Alignment::Center);
 
-                return final_column.into();
+                let content = container(final_column)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill);
+
+                return content.into();
             },
             ApplicationState::Client => {
                 let value_client = &self.input_value_client;
@@ -434,8 +422,12 @@ impl ScreenSharer {
                     padded_button("stop recording").on_press(Message::StopRec),
                 );
                 }
+                let comeback_button = button("Return to the main menu")
+                .on_press(Message::ChangeApplicationState(ApplicationState::Start));
+
                 let content = row![]
-                .push(client_section);
+                .push(client_section)
+                .push(comeback_button);
 
                 return content.into();
             },
@@ -468,8 +460,11 @@ impl ScreenSharer {
         
                let selecting_area_button = button("Select the area to stream")
                .on_press(Message::ToggleSelectingArea);
+
+               let comeback_button = button("Return to the main menu")
+               .on_press(Message::ChangeApplicationState(ApplicationState::Start));
         
-                let content: Element<_> = column![stremer_section_started, screens_list, selecting_area_button, start_button]
+                let content: Element<_> = column![stremer_section_started, screens_list, selecting_area_button, start_button, comeback_button]
                     //.max_width(540)
                     .spacing(20)
                     .padding(20)
