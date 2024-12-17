@@ -21,7 +21,7 @@ use iced::widget::{Button, Column, Container, Slider,Text};
 use iced::{border, window, Alignment, Center, Color, ContentFit, Fill, Font, Length, Pixels, Size, Subscription};
 use iced::{Task};
 use iced::Border;
-
+use gst::Pipeline;
 #[cfg(target_os = "linux")]
 use ashpd::{
     desktop::{
@@ -77,6 +77,7 @@ struct ScreenSharer {
     first_point: Option<Point>,
     second_point: Option<Point>,
     is_selecting_area: bool,
+    is_blank:bool,
     window_id: window::Id,
     application_state: ApplicationState,
     available_display: Vec<Display>,
@@ -113,6 +114,7 @@ impl Default for ScreenSharer {
             application_state: ApplicationState::Start,
             available_display: displays,
             selected_screen: None,
+            is_blank:false
         }
     }
 }
@@ -144,6 +146,7 @@ enum Message {
     ChangeApplicationState(ApplicationState),
     ChangeSelectedScreen(Display),
     SetBlankScreen,
+    UnSetBlankScreen,
     #[cfg(target_os = "linux")]
     RetIdPipewire,
 }
@@ -152,7 +155,9 @@ impl ScreenSharer {
 
 
     fn update(&mut self, message: Message) ->Task<Message> {
+     
 
+        
 
         match message {
             Message::ChangeSelectedScreen(display) => {
@@ -333,7 +338,24 @@ impl ScreenSharer {
 
                 let  state =self.streamer_state.as_ref().unwrap();
                     let arcStreamerState =state.streamer_arc.lock();
-                    let streamres=arcStreamerState.expect("errore frov").share_static_image_end("blank.png".to_string());
+              
+                    let streamres=arcStreamerState.expect("errore getting  arc").share_static_image_end("blank.png".to_string());
+                    match streamres {
+                        Ok(())=> self.is_blank=true,
+                        Err(err) => println!("{:?}",&err)
+                        
+                    }
+            },
+            Message::UnSetBlankScreen => {
+
+                let  state =self.streamer_state.as_ref().unwrap();
+                    let arcStreamerState =state.streamer_arc.lock();
+                    let streamres=arcStreamerState.expect("errore  getting  arc").reStart();
+                    match streamres {
+                        Ok(())=> self.is_blank=false,
+                        Err(err) => println!("{:?}",&err)
+                        
+                    }
             },
         }
         Task::none()
@@ -448,11 +470,15 @@ impl ScreenSharer {
                     let start_button =padded_button("Start sharing screen").on_press(Message::StreamerPressed);
                         }
                     }
+                    let blankbutton=match self.is_blank {
+                        false=>  padded_button("Blank the streamed screen").on_press(Message::SetBlankScreen),
+                        true=> padded_button("Unblank the streamed screen").on_press(Message::UnSetBlankScreen)
+                        
+                    };
               let stremer_section_started =  Self::container("Streamer")
               .push(
                   "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )",
-              ).push(Text::new(&self.ips)).push(padded_button("Blank the streamed screen")
-              .on_press(Message::SetBlankScreen) )
+              ).push(Text::new(&self.ips)).push(blankbutton )
               .push(padded_button("End Stream")
               .on_press(Message::StopStreamerPressed) 
             

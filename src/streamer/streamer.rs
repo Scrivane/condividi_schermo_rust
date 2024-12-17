@@ -31,9 +31,12 @@ pub struct ScreenStreamer {
     clients: Arc<Mutex<Vec<String>>>,
     is_streaming: bool,
     is_paused: bool,
+    capture_region:DimensionToCrop,
+    extrainfo: usize,
 }
 
 impl ScreenStreamer {
+    
     pub fn new(extrainfo: usize) -> Result<Self, ServerError> {  //for linux monitor id =valnode =extrainfo
         gst::init().map_err(|e| ServerError {
             message: format!("Failed to initialize GStreamer: {}", e),
@@ -46,7 +49,7 @@ impl ScreenStreamer {
             left: 300,
         };
 
-        let pipeline = Self::create_pipeline2(capture_region, extrainfo).expect("errore creazioen pipeline screenstremer");
+        let pipeline = Self::create_pipeline2(&capture_region, extrainfo).expect("errore creazioen pipeline screenstremer");
 
         let bus = pipeline.bus().unwrap();
         let pipeline_clone = pipeline.clone();
@@ -78,11 +81,13 @@ impl ScreenStreamer {
             clients: Arc::new(Mutex::new(vec![])),
             is_streaming: false,
             is_paused: false,
+            capture_region : capture_region,
+            extrainfo: extrainfo,
         })
     }
 
 
-    fn create_pipeline2(crop: DimensionToCrop, extra: usize) -> Result<Pipeline, ServerError> {
+    fn create_pipeline2(crop: &DimensionToCrop, extra: usize) -> Result<Pipeline, ServerError> {
 
         //Creazione dei videosource specializzate per ogni OS
         #[cfg(target_os = "windows")]
@@ -578,6 +583,23 @@ impl ScreenStreamer {
         let pipeline = self.pipeline.as_ref().ok_or_else(|| "Pipeline is not initialized".to_string())?;
         pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline to Playing".to_string())?;
         self.is_streaming = true;
+
+        Ok(())
+    }
+    pub fn reStart(&mut self) -> Result<(), String> {
+        if let Some(ref oldpipeline) = self.pipeline {
+            oldpipeline.set_state(gst::State::Null).map_err(|e| ServerError {
+                message: format!("Failed to set old pipeline state to null"),
+            }).expect("errore stopping old pipeline");
+        
+        }
+        let pipe=ScreenStreamer::create_pipeline2(&self.capture_region, self.extrainfo).expect("Error reCreating the pipeline");
+
+        //self.is_streaming = true;
+        self.pipeline = Some(pipe);
+        ScreenStreamer::update_multiudpsink(self);
+        ScreenStreamer::start( self);
+
 
         Ok(())
     }
