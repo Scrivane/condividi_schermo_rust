@@ -1,4 +1,4 @@
-use iced::{advanced::{graphics::futures::subscription, Widget}, keyboard::{self, key::Named, Event::KeyPressed, Key, Modifiers}, theme, widget::image::Handle};
+use iced::{keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
@@ -11,9 +11,8 @@ use iced::{
     mouse::{self, Event::{ButtonPressed, ButtonReleased, CursorMoved}},
      Element, Point, Theme};
 use iced::widget::{
-     column, row, text, text_input
+     column, row, text, text_input, Column
 };
-use iced::widget::{Button, Column};
 use iced::{border, window, Alignment, Color, Length, Subscription};
 use iced::Task;
 
@@ -34,11 +33,10 @@ use screenshots::Screen;
 #[cfg(target_os = "linux")]
 use zbus::fdo::Error;
 
-use cfg_if::cfg_if;
 use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
 
-use crate::{main, streamer::client::StreamerClient};
+use crate::streamer::client::StreamerClient;
 use crate::StreamerState;
 
 use iced::application;
