@@ -1,4 +1,4 @@
-use iced::{advanced::Widget, theme, widget::image::Handle};
+use iced::{advanced::{graphics::futures::subscription, Widget}, keyboard::{self, key::Named, Event::KeyPressed, Key, Modifiers}, theme, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
@@ -161,7 +161,6 @@ impl ScreenSharer {
                     if let Ok(client) = client_handle.join() {
                         self.streamer_client = Some(client);
                     }
-       
             }
             Message::StartRecording => {
                 match self.streamer_client  {
@@ -302,7 +301,6 @@ impl ScreenSharer {
                     match streamres {
                         Ok(())=> self.is_blank=true,
                         Err(err) => println!("{:?}",&err)
-                        
                     }
             },
             Message::UnSetBlankScreen => {
@@ -335,8 +333,52 @@ impl ScreenSharer {
                 _ => None,
             })
         }
-        else{
-            iced::Subscription::none()
+        else {
+            match  self.streaming_state{
+                StreamingState::Starting => {
+                    match self.application_state {
+                        ApplicationState::Start => {
+                            Subscription::none()
+                        },
+                        ApplicationState::Streamer => {
+                            event::listen_with(|event, status, _queue| match (event, status) {
+                                (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
+                                    if key ==  Key::Character("s".into()) && modifiers.control() =>
+                                {
+                                    println!("faccio partire lo streaming");
+                                    Some(Message::StreamerPressed) 
+                                },
+                                _ => None,
+                            })
+                        },
+                        ApplicationState::Client => {
+                            Subscription::none()
+                        },
+                    }
+                },
+                StreamingState::Play => {
+                    event::listen_with(|event, status, _queue| match (event, status) {
+                        (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
+                            if key ==  Key::Character("p".into()) && modifiers.control() =>
+                        {
+                            println!("metto in pausa lo streaming");
+                            Some(Message::StopStreamerPressed) 
+                        },
+                        _ => None,
+                    })
+                },
+                StreamingState::Pause => {
+                    event::listen_with(|event, status, _queue| match (event, status) {
+                        (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
+                            if key ==  Key::Character("r".into()) && modifiers.control() =>
+                        {
+                            println!("faccio ripartire lo streamer");
+                            Some(Message::StopStreamerPressed) 
+                        },
+                        _ => None,
+                    })
+                },
+            }   
         }
     }
 
