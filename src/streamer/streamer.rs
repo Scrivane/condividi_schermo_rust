@@ -20,10 +20,10 @@ use ashpd::{
 use tokio::runtime::Runtime;
 
 pub struct DimensionToCrop {
-    top: i32,
-    bottom: i32,
-    right: i32,
-    left: i32,
+    pub top: i32,
+    pub bottom: i32,
+    pub right: i32,
+    pub left: i32,
 }
 
 pub struct ScreenStreamer {

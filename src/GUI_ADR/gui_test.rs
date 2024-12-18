@@ -2,6 +2,7 @@ use iced::{advanced::Widget, theme, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
+use cropper::dimension_to_crop;
 use iced::widget::{self, button, center, container, pick_list, Canvas, MouseArea};
 use std::{thread, time::Duration};
 use iced::{
@@ -42,7 +43,7 @@ use crate::StreamerState;
 
 use iced::application;
 
-use super::{display, icon, selector_draw};
+use super::{cropper, display, icon, selector_draw};
 
 pub fn run_iced() -> iced::Result {
     iced::application("Ferris - Iced", ScreenSharer::update, ScreenSharer::view)
@@ -169,10 +170,7 @@ impl ScreenSharer {
                         client.start_recording();
                         //println!("{} / {} = {}", dividend, divisor, quotient)
                     },
-                    
                 }
-
-   
         }
         Message::StopRec => {
             match self.streamer_client  {
@@ -181,16 +179,11 @@ impl ScreenSharer {
                     client.stop_recording();
               
                 },
-                
             }
     }
             Message::StopClientPressed => {
                 if let Some(player) = self.streamer_client.take() {
-
-                    
                     std::thread::spawn(move || {
-                       
-                        
                         crate::stop_client(player).unwrap(); // Handle error appropriately
                     });
                 }
@@ -202,6 +195,8 @@ impl ScreenSharer {
             }
             Message::StreamerPressed => {
                 let id_screen: usize = self.selected_screen.unwrap().id as usize;
+                let crop = dimension_to_crop(self.first_point, self.second_point, self.selected_screen);
+
                 match get_if_addrs() {
                     Ok(interfaces) => {
                         let mut all_ips = String::new();
@@ -219,7 +214,6 @@ impl ScreenSharer {
                         eprintln!("Error retrieving network interfaces: {}", e);
                     }
                 }
-
                 // Start the streamer in a separate thread and store the result in self.streamer_state.
                 let valnode:usize=self.valnode.clone().try_into().expect("can't convert into usize");
                 let streamer_state = std::thread::spawn(move || {
@@ -268,7 +262,7 @@ impl ScreenSharer {
                     }
                     
                 },
-                    Err(ServerError)=> println!("Server error while streaming static image"),
+                    Err(e)=> println!("Server error while streaming static image: {}", e),
                     
                 }
             },
@@ -412,7 +406,7 @@ impl ScreenSharer {
                 let mut client_section_started = Self::container("Client")
                 .push(
                     "Currently receiving screencast",
-                ).push(padded_button("End client")
+                ).push(button("End client")
                 .on_press(Message::StopClientPressed));
                     if self
                 .streamer_client
@@ -420,11 +414,11 @@ impl ScreenSharer {
                 .map_or_else(|| false, |client| client.get_is_rec()) ==false
                 {
                     client_section_started=client_section_started.push(
-                    padded_button("start recording").on_press(Message::StartRecording),
+                    button("start recording").on_press(Message::StartRecording),
                 );
                 } else {
                     client_section_started=client_section_started.push(
-                    padded_button("stop recording").on_press(Message::StopRec),
+                    button("stop recording").on_press(Message::StopRec),
                 );
                 }
 
@@ -611,13 +605,10 @@ fn style(&self, theme: &Theme) -> application::Appearance {
             application::Appearance {
                 background_color: Color::TRANSPARENT,
                 text_color: theme.palette().text,
-
-             
             }
         }
         else {
             Theme::default_style(theme)
-            
         } 
 }
     fn can_continue_client(&self) -> bool {  //valuta se l'ip inserito è valido "migliorabile controllando se è un ip raggiungibile"
@@ -659,8 +650,3 @@ async fn pipewirerec() -> Result<u32,u32>{
     println!("valnode: {:?}", valnode);
     Ok(valnode)
 }
-
-fn padded_button<Message: Clone>(label: &str) -> Button<'_, Message> {
-    button(text(label)).padding([12, 24])
-}
-
