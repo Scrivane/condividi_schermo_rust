@@ -1,26 +1,15 @@
 use selector_draw::MyCanvas;
 use display::Display;
-use clap::{error};
-use iced::daemon::DefaultStyle;
-use iced::theme::palette::Background;
-use iced::widget::canvas::{Frame, Geometry, Program};
 use iced::widget::tooltip::Position;
-use iced::widget::{self, button, center, container, image, pick_list, tooltip, Canvas};
+use iced::widget::{self, button, center, container, pick_list, Canvas};
 use std::{thread, time::Duration};
-use iced::window::Id;
 use iced::{
     touch::Event::FingerMoved,
     event::{self, Event, Status}, 
     mouse::{self, Event::{ButtonPressed, ButtonReleased, CursorMoved}},
-     Element, Point, Rectangle, Renderer, Theme};
-use iced::widget::{
-     checkbox, column, horizontal_space, radio, row,
-    scrollable, slider, text, text_input, toggler, vertical_space
-};
-use iced::widget::{Button, Column, Container, Slider,Text};
-use iced::{border, window, Alignment, Center, Color, ContentFit, Fill, Font, Length, Pixels, Size, Subscription};
-use iced::{Task};
-use iced::Border;
+     Element, Point, Theme};
+use iced::widget::{Button, Column, Container, Slider, Text, column, row, text, text_input};
+use iced::{border, window, Alignment, Center, Color, ContentFit, Fill, Font, Length, Pixels, Size, Subscription, Task};
 
 #[cfg(target_os = "linux")]
 use ashpd::{
@@ -65,9 +54,6 @@ enum ApplicationState{
 }
 
 struct ScreenSharer {
-    position: Position,
-    user_type:  UserType,
-    input_value_streamer: String,
     input_value_client: String,
     ips:    String,
     streamer_client: Option<StreamerClient>,
@@ -97,9 +83,6 @@ impl Default for ScreenSharer {
         }).collect();
 
         Self{
-            position: Position::Top,
-            user_type: UserType::None,
-            input_value_streamer: "".to_string(),
             input_value_client: "".to_string(),
             ips: "".to_string(),
             streamer_client: None,
@@ -116,15 +99,6 @@ impl Default for ScreenSharer {
         }
     }
 }
-
-#[derive(Default,Debug)]
-enum UserType{  // sposta in main qunado è ora, di default è clioent
-    client,
-    streamer,
-    #[default]
-    None,
-}
-
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -159,8 +133,6 @@ impl ScreenSharer {
                 self.selected_screen = Some(display);
             },
             Message::ClientPressed => {
-                    self.user_type = UserType::client;
-               
                     let ip:IpAddr=self.input_value_client.clone().trim().parse::<IpAddr>().unwrap();
                     let client_handle = std::thread::spawn(move || {
                         crate::start_client(ip).unwrap() // in futuro maneggia errori
@@ -169,16 +141,9 @@ impl ScreenSharer {
                     if let Ok(client) = client_handle.join() {
                         self.streamer_client = Some(client);
                     }
-
-                    println!("{:?}",&self.user_type);
        
             }
             Message::StartRecording => {
-                
-          
-                println!("Starting recording {:?}",&self.user_type);
-
-
                 match self.streamer_client  {
                     None => println!("failed! No client was started before clicking on recording "),
                     Some(ref mut client) => {
@@ -191,9 +156,6 @@ impl ScreenSharer {
    
         }
         Message::StopRec => {
-            println!("Stop recording {:?}",&self.user_type);
-
-
             match self.streamer_client  {
                 None => println!("failed! No client was started before clicking on stop recording "),
                 Some(ref mut client) => {
@@ -220,12 +182,8 @@ impl ScreenSharer {
                         crate::stop_client(player).unwrap(); // Handle error appropriately
                     });
                 }
-                self.user_type = UserType::None;
-
-                println!("ho finito lo stream {:?}",&self.user_type);
             }
             Message::StreamerPressed => {
-                self.user_type = UserType::streamer;
                 let id_screen: usize = self.selected_screen.unwrap().id as usize;
          
                 match get_if_addrs() {
@@ -290,7 +248,6 @@ impl ScreenSharer {
                             crate::stop_streamer(state).expect("Failed to stop streamer");
                         });
                         println!("Streamer stopped.");
-                        self.user_type = UserType::None;
                     } else {
                         println!("No active streamer to stop.");
                     }
@@ -531,43 +488,8 @@ fn style(&self, theme: &Theme) -> application::Appearance {
         else {
             Theme::default_style(theme)
             
-        }
-    
-        
-        
-   
+        } 
 }
-
-
-    fn can_continue_streamer(&self) -> bool {  //trafrorma in enum cosi da gestire monitor non inserito , monitor sbagliiato o buono
-
-
-        let display_infos = DisplayInfo::all().unwrap();
-        let mut monitor_ids = Vec::new();
-        let mut id = 0;
-    
-        for display_info in display_infos {
-            println!("Name : {}, number {}", display_info.name, id);
-            monitor_ids.push(id);
-            id += 1;
-        }
-    
-        let mut selected_monitor = 0;
-        
-
-
-            match self.input_value_streamer.clone().trim().parse() {
-                Ok(num) if num < monitor_ids.len() => {
-                    selected_monitor = num;
-                    return true;
-                }
-                _ => {
-                    println!("Invalid input. Please enter a valid monitor number.");
-                    return false;
-                }
-            }
-
-    }
     fn can_continue_client(&self) -> bool {  //valuta se l'ip inserito è valido "migliorabile controllando se è un ip raggiungibile"
         self.input_value_client.clone().trim().parse::<IpAddr>().is_ok()
 
@@ -576,9 +498,6 @@ fn style(&self, theme: &Theme) -> application::Appearance {
         column![text(title).size(50)].spacing(20)
     }
 }
-
-
-
 
 #[cfg(target_os = "linux")]
 async fn pipewirerec() -> Result<u32,u32>{
@@ -610,7 +529,6 @@ async fn pipewirerec() -> Result<u32,u32>{
     println!("valnode: {:?}", valnode);
     Ok(valnode)
 }
-
 
 fn padded_button<Message: Clone>(label: &str) -> Button<'_, Message> {
     button(text(label)).padding([12, 24])
