@@ -130,7 +130,7 @@ impl ScreenStreamer {
             if #[cfg(target_os = "linux")] {
 
 
-                let videoRate = gst::ElementFactory::make("videorate").property("max-rate", 30).property("drop-only", true)
+                let videoRate = gst::ElementFactory::make("videorate").property("do-timestamp", true).property("max-rate", 30).property("drop-only", true)
                 .build()
                     .map_err(|_| ServerError {
                         message: "Failed to create videoRate".to_string(),
