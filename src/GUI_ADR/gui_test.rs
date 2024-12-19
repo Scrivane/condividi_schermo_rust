@@ -89,6 +89,7 @@ impl Default for ScreenSharer {
         let displays: Vec<Display> = screen
         .iter()
         .map(|screen| Display{
+            //aggiungere conteggio da 1 in su;
             id: screen.display_info.id,
             width: screen.display_info.width,
             height: screen.display_info.height,
@@ -144,10 +145,6 @@ impl ScreenSharer {
 
 
     fn update(&mut self, message: Message) ->Task<Message> {
-     
-
-        
-
         match message {
             Message::ChangeSelectedScreen(display) => {
                 self.selected_screen = Some(display);
@@ -197,9 +194,6 @@ impl ScreenSharer {
                 
                 #[cfg(not(target_os = "linux"))]
                 let id_screen: usize = self.selected_screen.unwrap().id as usize;
-                #[cfg(target_os = "linux")]
-                let id_screen:usize=self.valnode.unwrap().clone().try_into().expect("can't convert into usize");
-
 
                 match get_if_addrs() {
                     Ok(interfaces) => {
@@ -218,6 +212,9 @@ impl ScreenSharer {
                         eprintln!("Error retrieving network interfaces: {}", e);
                     }
                 }
+                #[cfg(target_os = "linux")]
+                let id_screen:usize=self.valnode.unwrap().clone().try_into().expect("can't convert into usize");
+
                 // Start the streamer in a separate thread and store the result in self.streamer_state.
                 let streamer_state = std::thread::spawn(move || {
                     crate::start_streamer(crop, id_screen).unwrap()
@@ -254,7 +251,6 @@ impl ScreenSharer {
                     Ok(())=> { println!("Streaming end stream image");
                     if let Some(state) = self.streamer_state.take() {
                         std::thread::spawn(move || {
-
                             thread::sleep(Duration::from_millis(40000));
                             crate::stop_streamer(state).expect("Failed to stop streamer");
                         });
@@ -318,7 +314,9 @@ impl ScreenSharer {
                     }
             },
             Message::PauseStreaming => {
-                //todo
+                let  state =self.streamer_state.as_ref().unwrap();
+                    let arc_streamer_state =state.streamer_arc.lock();
+                    let streamer=arc_streamer_state.expect("errore  getting  arc").pause();
             },
             Message::ResumeStreaming => {
                 //todo
@@ -584,7 +582,7 @@ impl ScreenSharer {
                         let pause_stream_button = button("Pause Stream")
                         .width(400)
                         .padding(30)
-                        .on_press(Message::StopStreamerPressed);
+                        .on_press(Message::PauseStreaming);
 
                         let end_stream_button = button("End Stream")
                         .width(400)
