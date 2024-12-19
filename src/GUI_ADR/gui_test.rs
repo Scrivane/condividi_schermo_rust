@@ -193,13 +193,12 @@ impl ScreenSharer {
                 }
             }
             Message::StreamerPressed => {
-                let id_screen: usize = self.selected_screen.unwrap().id as usize;
-
-                #[cfg(not(target_os = "linux"))]
                 let crop = dimension_to_crop(self.first_point, self.second_point, self.selected_screen);
                 
+                #[cfg(not(target_os = "linux"))]
+                let id_screen: usize = self.selected_screen.unwrap().id as usize;
                 #[cfg(target_os = "linux")]
-                let crop:usize=self.valnode.unwrap().clone().try_into().expect("can't convert into usize");
+                let id_screen:usize=self.valnode.unwrap().clone().try_into().expect("can't convert into usize");
 
 
                 match get_if_addrs() {
