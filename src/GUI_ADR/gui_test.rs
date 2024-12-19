@@ -674,14 +674,14 @@ fn style(&self, theme: &Theme) -> application::Appearance {
 async fn pipewirerec() -> Result<u32,u32>{
     let proxy = Screencast::new().await.expect("couln not start screencast proxi");
     let mut valnode: u32 = 0;
-
+   
     let session = proxy.create_session().await.expect("couln not start screencast session");
     proxy
         .select_sources(
             &session,
             CursorMode::Metadata,
             SourceType::Monitor | SourceType::Window,
-            true,  //was true 
+            false,  //useful to avoid selecting more monitors
             None,
             PersistMode::DoNot,
         )
