@@ -1,12 +1,11 @@
-use std::env;
 use std::error::Error;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
-use cfg_if::cfg_if;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use display_info::DisplayInfo;
+use streamer::streamer::DimensionToCrop;
 
 mod streamer;
 mod connection;
@@ -67,11 +66,13 @@ struct StreamerState {
 }
 
 #[cfg(feature = "icedf")]
-fn start_streamer(num_monitor: usize) -> Result<StreamerState, Box<dyn Error>> {
+fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<StreamerState, Box<dyn Error>> {
+
+
     let (control_sender, control_receiver) = mpsc::channel();
     let (client_sender, client_receiver) = mpsc::channel();
 
-    let streamer = ScreenStreamer::new(num_monitor).expect("errore creazione scren streamer");
+    let streamer = ScreenStreamer::new(dimension, num_monitor).expect("errore creazione scren streamer");
     let streamer_arc = Arc::new(Mutex::new(streamer));
 
     let mut discovery_server = DiscoveryServer::new(client_sender);

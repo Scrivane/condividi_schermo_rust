@@ -32,24 +32,17 @@ pub struct ScreenStreamer {
     is_streaming: bool,
     is_paused: bool,
     capture_region:DimensionToCrop,
-    extrainfo: usize,
+    monitor_index: usize,
 }
 
 impl ScreenStreamer {
     
-    pub fn new(extrainfo: usize) -> Result<Self, ServerError> {  //for linux monitor id =valnode =extrainfo
+    pub fn new(dimension: DimensionToCrop, monitor_index: usize) -> Result<Self, ServerError> {  //for linux monitor id =valnode =extrainfo
         gst::init().map_err(|e| ServerError {
             message: format!("Failed to initialize GStreamer: {}", e),
         })?;
 
-        let capture_region = DimensionToCrop {
-            top: 300,
-            bottom: 300,
-            right: 300,
-            left: 300,
-        };
-
-        let pipeline = Self::create_pipeline2(&capture_region, extrainfo).expect("errore creazioen pipeline screenstremer");
+        let pipeline = Self::create_pipeline2(&dimension, monitor_index).expect("errore creazioen pipeline screenstremer");
 
         let bus = pipeline.bus().unwrap();
         let pipeline_clone = pipeline.clone();
@@ -81,13 +74,13 @@ impl ScreenStreamer {
             clients: Arc::new(Mutex::new(vec![])),
             is_streaming: false,
             is_paused: false,
-            capture_region : capture_region,
-            extrainfo: extrainfo,
+            capture_region : dimension,
+            monitor_index: monitor_index,
         })
     }
 
 
-    fn create_pipeline2(crop: &DimensionToCrop, extra: usize) -> Result<Pipeline, ServerError> {
+    fn create_pipeline2(crop: &DimensionToCrop, monitor_index: usize) -> Result<Pipeline, ServerError> {
 
         //Creazione dei videosource specializzate per ogni OS
         #[cfg(target_os = "windows")]
@@ -103,7 +96,7 @@ impl ScreenStreamer {
         #[cfg(target_os = "macos")]
         let videosrc = gst::ElementFactory::make("avfvideosrc")
             .property("capture-screen", true)
-           // .property("device-index", &extra)
+            //.property("device-index", &extra )
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
@@ -593,7 +586,7 @@ impl ScreenStreamer {
             }).expect("errore stopping old pipeline");
         
         }
-        let pipe=ScreenStreamer::create_pipeline2(&self.capture_region, self.extrainfo).expect("Error reCreating the pipeline");
+        let pipe=ScreenStreamer::create_pipeline2(&self.capture_region, self.monitor_index).expect("Error reCreating the pipeline");
 
         //self.is_streaming = true;
         self.pipeline = Some(pipe);

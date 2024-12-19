@@ -134,6 +134,8 @@ enum Message {
     ChangeSelectedScreen(Display),
     SetBlankScreen,
     UnSetBlankScreen,
+    PauseStreaming,
+    ResumeStreaming,
     #[cfg(target_os = "linux")]
     RetIdPipewire,
 }
@@ -212,9 +214,8 @@ impl ScreenSharer {
                     }
                 }
                 // Start the streamer in a separate thread and store the result in self.streamer_state.
-                let valnode:usize=self.valnode.clone().try_into().expect("can't convert into usize");
                 let streamer_state = std::thread::spawn(move || {
-                    crate::start_streamer(valnode).unwrap()
+                    crate::start_streamer(crop, id_screen).unwrap()
                 });
                 if let Ok(streamer) = streamer_state.join() {
                     self.streamer_state = Some(streamer);
@@ -242,9 +243,9 @@ impl ScreenSharer {
             }
             Message::StopStreamerPressed => {
                 let  state =self.streamer_state.as_ref().unwrap();
-                let arcStreamerState =state.streamer_arc.lock();
-                let resImgStream=arcStreamerState.expect("errore frov").share_static_image_end("end_stream_ai.png".to_string());
-                match resImgStream {
+                let arc_streamer_state =state.streamer_arc.lock();
+                let res_img_stream=arc_streamer_state.expect("errore frov").share_static_image_end("end_stream_ai.png".to_string());
+                match res_img_stream {
                     Ok(())=> { println!("Streaming end stream image");
                     if let Some(state) = self.streamer_state.take() {
                         std::thread::spawn(move || {
@@ -293,9 +294,9 @@ impl ScreenSharer {
             },
             Message::SetBlankScreen => {
                 let  state =self.streamer_state.as_ref().unwrap();
-                    let arcStreamerState =state.streamer_arc.lock();
+                    let arc_streamer_state =state.streamer_arc.lock();
               
-                    let streamres=arcStreamerState.expect("errore getting  arc").share_static_image_end("blank.png".to_string());
+                    let streamres=arc_streamer_state.expect("errore getting  arc").share_static_image_end("blank.png".to_string());
                     match streamres {
                         Ok(())=> self.is_blank=true,
                         Err(err) => println!("{:?}",&err)
@@ -303,14 +304,20 @@ impl ScreenSharer {
             },
             Message::UnSetBlankScreen => {
                 let  state =self.streamer_state.as_ref().unwrap();
-                    let arcStreamerState =state.streamer_arc.lock();
-                    let streamres=arcStreamerState.expect("errore  getting  arc").reStart();
+                    let arc_streamer_state =state.streamer_arc.lock();
+                    let streamres=arc_streamer_state.expect("errore  getting  arc").reStart();
                     match streamres {
                         Ok(())=> self.is_blank=false,
                         Err(err) => println!("{:?}",&err)
                         
                     }
             },
+            Message::PauseStreaming => {
+                //todo
+            },
+            Message::ResumeStreaming => {
+                //todo
+            }
         }
         Task::none()
     }
@@ -360,7 +367,7 @@ impl ScreenSharer {
                             if key ==  Key::Character("p".into()) && modifiers.control() =>
                         {
                             println!("metto in pausa lo streaming");
-                            Some(Message::StopStreamerPressed) 
+                            Some(Message::PauseStreaming) 
                         },
                         _ => None,
                     })
@@ -371,7 +378,7 @@ impl ScreenSharer {
                             if key ==  Key::Character("r".into()) && modifiers.control() =>
                         {
                             println!("faccio ripartire lo streamer");
-                            Some(Message::StopStreamerPressed) 
+                            Some(Message::ResumeStreaming) 
                         },
                         _ => None,
                     })
