@@ -104,7 +104,7 @@ impl ScreenStreamer {
             if #[cfg(target_os = "linux")] {
              
                 let videosrc = gst::ElementFactory::make("pipewiresrc")
-                    .property("path", extra.to_string())
+                    .property("path", monitor_index.to_string())
                     .build()
                     .map_err(|_| ServerError {
                         message: "Failed to create pipewiresrc".to_string(),

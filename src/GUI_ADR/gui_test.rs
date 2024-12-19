@@ -213,7 +213,7 @@ impl ScreenSharer {
                     }
                 }
                 #[cfg(target_os = "linux")]
-                let id_screen:usize=self.valnode.unwrap().clone().try_into().expect("can't convert into usize");
+                let id_screen:usize=self.valnode as usize;
 
                 // Start the streamer in a separate thread and store the result in self.streamer_state.
                 let streamer_state = std::thread::spawn(move || {
