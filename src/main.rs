@@ -33,33 +33,9 @@ enum ControlMessage {
     Resume,
     Stop,
 }
-
-fn handle_event(sender: mpsc::Sender<ControlMessage>) -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?;
-    loop {
-        if event::poll(std::time::Duration::from_millis(500))? {
-            if let Event::Key(key_event) = event::read()? {
-                if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                    match key_event.code {
-                        KeyCode::Char('p') => sender.send(ControlMessage::Pause)?,
-                        KeyCode::Char('r') => sender.send(ControlMessage::Resume)?,
-                        KeyCode::Char('c') => {
-                            sender.send(ControlMessage::Stop)?;
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-    }
-    disable_raw_mode()?;
-    Ok(())
-}
 #[cfg(feature = "icedf")]
 struct StreamerState {
     control_sender: mpsc::Sender<ControlMessage>,
-    control_thread: thread::JoinHandle<()>,
     client_thread: thread::JoinHandle<()>,
     discovery_thread: thread::JoinHandle<()>,
     streamer_arc: Arc<Mutex<ScreenStreamer>>,
@@ -79,22 +55,7 @@ fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<Stre
     let discovery_thread = thread::spawn(move || {
         println!("Starting discovery server...");
         discovery_server.run_discovery_listener().expect("Failed to run discovery server");
-    });
-
-    let streamer_arc_clone = Arc::clone(&streamer_arc);
-    let control_thread = thread::spawn(move || {
-        while let Ok(message) = control_receiver.recv() {
-            let mut streamer = streamer_arc_clone.lock().unwrap();
-            match message {
-                ControlMessage::Pause => streamer.pause(),
-                ControlMessage::Resume => streamer.start().unwrap(),
-                ControlMessage::Stop => {
-                    streamer.stop();
-                    break;
-                }
-            }
-        }
-    });
+    });    
 
     let streamer_arc_clone = Arc::clone(&streamer_arc);
     let client_thread = thread::spawn(move || {
@@ -119,79 +80,18 @@ fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<Stre
 
     Ok(StreamerState {
         control_sender,
-        control_thread,
-        client_thread,
-        discovery_thread,
-        streamer_arc,
-    })
-}/* 
-#[cfg(feature = "icedf")]
-fn start_streamer2(valnode: u32) -> Result<StreamerState, Box<dyn Error>> {
-    let (control_sender, control_receiver) = mpsc::channel();
-    let (client_sender, client_receiver) = mpsc::channel();
-
-    let streamer = ScreenStreamer::new(0,valnode).expect("errore creazione scren streamer");
-    let streamer_arc = Arc::new(Mutex::new(streamer));
-
-    let mut discovery_server = DiscoveryServer::new(client_sender);
-    let discovery_thread = thread::spawn(move || {
-        println!("Starting discovery server...");
-        discovery_server.run_discovery_listener().expect("Failed to run discovery server");
-    });
-
-    let streamer_arc_clone = Arc::clone(&streamer_arc);
-    let control_thread = thread::spawn(move || {
-        while let Ok(message) = control_receiver.recv() {
-            let mut streamer = streamer_arc_clone.lock().unwrap();
-            match message {
-                ControlMessage::Pause => streamer.pause(),
-                ControlMessage::Resume => streamer.start().unwrap(),
-                ControlMessage::Stop => {
-                    streamer.stop();
-                    break;
-                }
-            }
-        }
-    });
-
-    let streamer_arc_clone = Arc::clone(&streamer_arc);
-    let client_thread = thread::spawn(move || {
-        while let Ok(client_list) = client_receiver.recv() {
-            let client_list_clone = client_list.clone();
-            let streamer = streamer_arc_clone.lock().unwrap();
-            streamer.update_clients(client_list);
-            println!("Client list updated: {}", client_list_clone);
-        }
-    });
-
-    {
-        let mut streamer = streamer_arc.lock().unwrap();
-        streamer.start().expect("error in starting the streamer");
-        println!(
-            "Streamer started\n\
-            Press CTRL+C to stop the server\n\
-            Press CTRL+P to pause the stream\n\
-            Press CTRL+R to resume the stream"
-        );
-    }
-
-    Ok(StreamerState {
-        control_sender,
-        control_thread,
         client_thread,
         discovery_thread,
         streamer_arc,
     })
 }
 
- */
 #[cfg(feature = "icedf")]
 fn stop_streamer(state: StreamerState) -> Result<(), Box<dyn Error>> {
     // Send a stop message to the control thread
     state.control_sender.send(ControlMessage::Stop)?;
 
     // Wait for all threads to finish
-    state.control_thread.join().expect("Control thread panicked");
     state.client_thread.join().expect("Client thread panicked");
     state.discovery_thread.join().expect("Discovery thread panicked");
 
@@ -199,75 +99,6 @@ fn stop_streamer(state: StreamerState) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
-/* 
-fn start_streamer(num_monitor:usize) -> Result<(), Box<dyn Error>> { //mettere se si prova in modalità iced
-    
-  
-
-    let (control_sender, control_receiver) = mpsc::channel();
-    let (client_sender, client_receiver) = mpsc::channel();
-
-    let streamer = ScreenStreamer::new(num_monitor)?;
-    let streamer_arc = Arc::new(Mutex::new(streamer));
-
-    let mut discovery_server = DiscoveryServer::new(client_sender);
-    let discovery_thread = thread::spawn(move || {
-        println!("Starting discovery server...");
-        discovery_server.run_discovery_listener().expect("Failed to run discovery server");
-    });
-
-    // Gestisce i comandi di controllo in un thread separato
-    let streamer_arc_clone = Arc::clone(&streamer_arc);
-    let control_thread = thread::spawn(move || {
-        while let Ok(message) = control_receiver.recv() {
-            let mut streamer = streamer_arc_clone.lock().unwrap();
-            match message {
-                ControlMessage::Pause => streamer.pause(),
-                ControlMessage::Resume => streamer.start().unwrap(),
-                ControlMessage::Stop => {
-                    streamer.stop();
-                    break;
-                }
-
-            }
-        }
-    });
-
-    // Gestisce l'aggiunta di nuovi client in un altro thread
-    let streamer_arc_clone = Arc::clone(&streamer_arc);
-    let client_thread = thread::spawn(move || {
-        while let Ok(client_list) = client_receiver.recv() {
-            let client_list_clone = client_list.clone();
-            let  streamer = streamer_arc_clone.lock().unwrap();
-            streamer.update_clients(client_list);
-            println!("Client list update: {}", client_list_clone);
-        }
-    });
-
-    // Avvia lo streamer e gestisce gli eventi della tastiera
-    {
-        let mut streamer = streamer_arc.lock().unwrap();
-        streamer.start()?;
-        println!(
-            "Streamer started\n\
-            Press CTRL+C to stop the server\n\
-            Press CTRL+P to pause the stream\n\
-            Press CTRL+R to resume the stream"
-        );
-    }
-
-    handle_event(control_sender)?;
-
-    // Aspetta la terminazione dei thread
-    control_thread.join().expect("Control thread panicked");
-    client_thread.join().expect("Client thread panicked");
-    discovery_thread.join().expect("Discovery thread panicked");
-
-    Ok(())
-}
-
-*/
 
 #[cfg(not(feature = "icedf"))]
 fn start_streamer() -> Result<(), Box<dyn Error>> { //mettere se si prova in modalità iced
@@ -353,8 +184,6 @@ fn start_client(ip_addr: IpAddr) -> Result<StreamerClient, Box<dyn Error>> {
     let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
     player.start_streaming()?;
 
-    
-
     Ok(player)
 }
 
@@ -366,41 +195,13 @@ fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
     match player.get_is_rec() {
         true => player.stop_recording()?,
         false => println!("It's not recording , we can end the stream "),
-        
     } 
     
-    
     player.stop_streaming();
 
     Ok(())
 
-
 }
-/* 
-fn start_client(ip_addr: IpAddr) -> Result<(), Box<dyn Error>> {
-    let discovery_client = DiscoveryClient::new()?;
-
-    let (client_ip,client_port) = discovery_client.discover_server(ip_addr)?;
-    //let client_port_clone = client_port.clone();
-    
-
-   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
-    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
-
-    player.start_streaming()?;
-    println!("Client started at port {}. Press Enter to stop...", &client_port);
-    //player.start_recording()?;
-
-    let _ = std::io::stdin().read_line(&mut String::new());
-
-    //player.stop_recording()?;
-    player.stop_streaming();
-
-    Ok(())
-}
-
-
-*/
 
 #[cfg(not(feature = "icedf"))]
 fn start_client() -> Result<(), Box<dyn Error>> {
@@ -424,59 +225,6 @@ fn start_client() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-
-/* #[cfg(not(feature = "icedf"))]
-fn start_client() -> Result<(), Box<dyn Error>> {
-    let discovery_client = DiscoveryClient::new()?;
-    let (client_ip,client_port) = discovery_client.discover_server()?;
-    //let client_port_clone = client_port.clone();
-    
-
-   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
-    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
-
-    player.start_streaming()?;
-    println!("Client started at port {}. Press Enter to stop...", &client_port);
-    //player.start_recording()?;
-
-    let _ = std::io::stdin().read_line(&mut String::new());
-
-    //player.stop_recording()?;
-    player.stop_streaming();
-
-    Ok(())
-} */
-
-
-fn select_monitor() -> usize {
-    // Inizializza la finestra UI lampo
-    let display_infos = DisplayInfo::all().unwrap();
-    let mut monitor_ids = Vec::new();
-    let mut id = 0;
-
-    for display_info in display_infos {
-        println!("Name : {}, number {}", display_info.name, id);
-        monitor_ids.push(id);
-        id += 1;
-    }
-
-    let mut selected_monitor = 0;
-    loop {
-        println!("Select the monitor to stream (0, 1, 2, ...): ");
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).expect("Failed to read line");
-        match input.trim().parse() {
-            Ok(num) if num < monitor_ids.len() => {
-                selected_monitor = num;
-                break;
-            }
-            _ => {
-                println!("Invalid input. Please enter a valid monitor number.");
-            }
-        }
-    }
-    selected_monitor
-}
 #[cfg(feature = "icedf")]
 fn main()  {
     run_iced();

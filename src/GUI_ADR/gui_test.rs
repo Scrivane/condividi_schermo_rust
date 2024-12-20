@@ -192,10 +192,6 @@ impl ScreenSharer {
             }
             Message::StreamerPressed => {
                 let crop = dimension_to_crop(self.first_point, self.second_point, self.selected_screen);
-                
-                #[cfg(not(target_os = "linux"))]
-                let id_screen: usize = self.selected_screen.unwrap().id as usize;
-
                 match get_if_addrs() {
                     Ok(interfaces) => {
                         let mut all_ips = String::new();
@@ -213,22 +209,33 @@ impl ScreenSharer {
                         eprintln!("Error retrieving network interfaces: {}", e);
                     }
                 }
-                #[cfg(target_os = "linux")]
-                let id_screen:usize=self.valnode as usize;
+                
 
-                // Start the streamer in a separate thread and store the result in self.streamer_state.
-                let streamer_state = std::thread::spawn(move || {
-                    crate::start_streamer(crop, id_screen).unwrap()
-                });
-                if let Ok(streamer) = streamer_state.join() {
-                    self.streamer_state = Some(streamer);
-                    println!("Streamer started.");
-                    self.streaming_state = StreamingState::Play;
+                match self.selected_screen {
+                    Some(_) => {
+                        #[cfg(target_os = "linux")]
+                        let id_screen:usize=self.valnode as usize;
+                        #[cfg(not(target_os = "linux"))]
+                        let id_screen: usize = self.selected_screen.unwrap().id as usize;
+                                // Start the streamer in a separate thread and store the result in self.streamer_state.
+                        let streamer_state = std::thread::spawn(move || {
+                            crate::start_streamer(crop, id_screen).unwrap()
+                        });
+                        if let Ok(streamer) = streamer_state.join() {
+                            self.streamer_state = Some(streamer);
+                            println!("Streamer started.");
+                            self.streaming_state = StreamingState::Play;
+                        }
+                        else {
+                            println!("Streamer DID NOT started.");
+                            
+                        } 
+                    },
+                    None => {
+                        println!("Cannot start the stream until you choose the screen"); 
+                    },
                 }
-                else {
-                    println!("Streamer DID NOT started.");
-                    
-                } 
+               
             }
             #[cfg(target_os = "linux")]
             Message::RetIdPipewire => {
@@ -313,22 +320,54 @@ impl ScreenSharer {
             Message::UnSetBlankScreen => {
                 let  state =self.streamer_state.as_ref().unwrap();
                     let arc_streamer_state =state.streamer_arc.lock();
-                    let streamres=arc_streamer_state.expect("errore  getting  arc").reStart();
-                    match streamres {
-                        Ok(())=> self.is_blank=false,
-                        Err(err) => println!("{:?}",&err)
-                        
+                    let streamer=arc_streamer_state.expect("errore  getting  arc").restart();
+                    match streamer {
+                        true => {
+                            self.is_blank=false
+                        },
+                        false => {
+                            println!("Error in unblanking stream");
+                        },
                     }
             },
             Message::PauseStreaming => {
-                let  state =self.streamer_state.as_ref().unwrap();
-                    let arc_streamer_state =state.streamer_arc.lock();
-                    let streamer=arc_streamer_state.expect("errore  getting  arc").pause();
+                match self.streaming_state {
+                    StreamingState::Starting => {
+                        println!("There is no streaming to pause because we are in the starting mode");
+                    },
+                    StreamingState::Play => {
+                        let  state =self.streamer_state.as_ref().unwrap();
+                        let arc_streamer_state =state.streamer_arc.lock();
+                        let streamer=arc_streamer_state.expect("errore  getting  arc").pause();
+                        if streamer{
+                            //we have paused the streamer
+                            self.streaming_state = StreamingState::Pause;
+                        }
+                    },
+                    StreamingState::Pause => {
+                        println!("The streaming is already in pause");
+                    },
+                }
+                
             },
             Message::ResumeStreaming => {
-                let  state =self.streamer_state.as_ref().unwrap();
-                    let arc_streamer_state =state.streamer_arc.lock();
-                    let streamer=arc_streamer_state.expect("errore  getting  arc").reStart();
+                match self.streaming_state {
+                    StreamingState::Starting => {
+                        println!("There is no streaming to restart because we are in the starting mode");
+                    },
+                    StreamingState::Play => {
+                        println!("Streaming already playing");
+                    },
+                    StreamingState::Pause => {
+                        let  state =self.streamer_state.as_ref().unwrap();
+                        let arc_streamer_state =state.streamer_arc.lock();
+                        let streamer=arc_streamer_state.expect("errore  getting  arc").restart();
+                        if streamer{
+                            //we have restarted the streamer
+                            self.streaming_state = StreamingState::Play;
+                        }
+                    },
+                }
             }
         }
         Task::none()
@@ -362,8 +401,7 @@ impl ScreenSharer {
                                 (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
                                     if key ==  Key::Character("s".into()) && modifiers.control() =>
                                 {
-                                    println!("faccio partire lo streaming");
-                                    Some(Message::StreamerPressed) 
+                                        Some(Message::StreamerPressed) 
                                 },
                                 _ => None,
                             })
@@ -374,26 +412,46 @@ impl ScreenSharer {
                     }
                 },
                 StreamingState::Play => {
-                    event::listen_with(|event, status, _queue| match (event, status) {
-                        (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
-                            if key ==  Key::Character("p".into()) && modifiers.control() =>
-                        {
-                            println!("metto in pausa lo streaming");
-                            Some(Message::PauseStreaming) 
+                    match self.application_state {
+                        ApplicationState::Start => {
+                            Subscription::none()
                         },
-                        _ => None,
-                    })
+                        ApplicationState::Streamer => {
+                            event::listen_with(|event, status, _queue| match (event, status) {
+                                (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
+                                    if key ==  Key::Character("p".into()) && modifiers.control() =>
+                                {
+                                    Some(Message::PauseStreaming) 
+                                },
+                                _ => None,
+                            })
+                        },
+                        ApplicationState::Client => {
+                            Subscription::none()
+                        },
+                    }
+                    
                 },
                 StreamingState::Pause => {
-                    event::listen_with(|event, status, _queue| match (event, status) {
-                        (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
-                            if key ==  Key::Character("r".into()) && modifiers.control() =>
-                        {
-                            println!("faccio ripartire lo streamer");
-                            Some(Message::ResumeStreaming) 
+                    match self.application_state {
+                        ApplicationState::Start => {
+                            Subscription::none()
                         },
-                        _ => None,
-                    })
+                        ApplicationState::Streamer => {
+                            event::listen_with(|event, status, _queue| match (event, status) {
+                                (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
+                                    if key ==  Key::Character("r".into()) && modifiers.control() =>
+                                {
+                                    Some(Message::ResumeStreaming) 
+                                },
+                                _ => None,
+                            })
+                        },
+                        ApplicationState::Client => {
+                            Subscription::none()
+                        },
+                    }
+                    
                 },
             }   
         }
@@ -588,7 +646,8 @@ impl ScreenSharer {
                         .spacing(20);
                     },
                     StreamingState::Play => {
-                        let play_text = text( "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )");
+                        let play_text = text( "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )")
+                        .size(30);
                         let ip_text = text(&self.ips);
                         
                         let blankbutton=match self.is_blank {
@@ -621,7 +680,8 @@ impl ScreenSharer {
                         .push(end_stream_button);
                     },
                     StreamingState::Pause => {
-                        let pause_text = text("The streaming is currently in pause");
+                        let pause_text = text("The streaming is currently in pause")
+                        .size(30);
                         let end_stream_button = button("End Stream")
                         .width(400)
                         .padding(30)

@@ -323,7 +323,7 @@ impl ScreenStreamer {
 
         Ok(())
     }
-    pub fn reStart(&mut self) -> Result<(), String> {
+    pub fn restart(&mut self) -> bool {
         if let Some(ref oldpipeline) = self.pipeline {
             oldpipeline.set_state(gst::State::Null).map_err(|e| ServerError {
                 message: format!("Failed to set old pipeline state to null"),
@@ -335,10 +335,18 @@ impl ScreenStreamer {
         //self.is_streaming = true;
         self.pipeline = Some(pipe);
         ScreenStreamer::update_multiudpsink(self);
-        ScreenStreamer::start( self);
+        let restart_result = ScreenStreamer::start(self);
 
-
-        Ok(())
+        match restart_result {
+            Ok(_) => {
+                println!("Streaming is restarting");
+                return true;
+            },
+            Err(e) => {
+                println!("Error in restarting the streaming: {}", e);
+                return false;
+            },
+        }
     }
 
     pub fn stop(&mut self) {
@@ -349,13 +357,25 @@ impl ScreenStreamer {
         self.is_streaming = false;
     }
 
-    pub fn pause(&mut self) {
+    pub fn pause(&mut self) -> bool {
         if let Some(ref pipeline) = self.pipeline {
             if self.is_streaming {
-                let _ = pipeline.set_state(State::Paused).map(|_| ());
-                self.is_paused = true;
+                let pause_result = pipeline.set_state(State::Paused);
+                match pause_result {
+                    Ok(_) => {
+                        println!("Pause the streaming correctly");
+                        self.is_paused = true;
+                        return true;
+                    },
+                    Err(e) => {
+                        println!("Error in pausing the screen: {}", e);
+                        return false;
+                    },
+                }
             }
         }
+        println!("pipeline does not exist, cannot pause");
+        return false;
     }
 
 
