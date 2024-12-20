@@ -288,7 +288,7 @@ impl ScreenSharer {
                     },
                     None => {
                 return Task::batch(vec![
-                    window::change_mode(self.window_id, window::Mode::Fullscreen),   // Metti a schermo intero
+                    window::get_latest().and_then(iced::window::toggle_maximize),   // Metti a schermo intero
                     Task::perform(async { true }, |_| Message::SetSelectingArea),
                 ]);
             },}},
