@@ -280,10 +280,19 @@ impl ScreenSharer {
                 self.is_selecting_area = false;
             },
             Message::ToggleSelectingArea => {
-                return Task::batch(vec![
-                    window::change_mode(self.window_id, window::Mode::Fullscreen),   // Metti a schermo intero
-                    Task::perform(async { true }, |_| Message::SetSelectingArea),
-                ]);
+                match self.first_point {
+                    Some(_) => {
+                        self.first_point = None;
+                        self.second_point = None;
+                    },
+                    None => {
+                        return Task::batch(vec![
+                            window::change_mode(self.window_id, window::Mode::Fullscreen),   // Metti a schermo intero
+                            Task::perform(async { true }, |_| Message::SetSelectingArea),
+                        ]);
+                    },
+                }
+                
             },
             Message::SetSelectingArea => {
                 self.first_point = None;
@@ -319,7 +328,9 @@ impl ScreenSharer {
                     let streamer=arc_streamer_state.expect("errore  getting  arc").pause();
             },
             Message::ResumeStreaming => {
-                //todo
+                let  state =self.streamer_state.as_ref().unwrap();
+                    let arc_streamer_state =state.streamer_arc.lock();
+                    let streamer=arc_streamer_state.expect("errore  getting  arc").reStart();
             }
         }
         Task::none()
@@ -517,10 +528,22 @@ impl ScreenSharer {
                         .padding(30)
                         .placeholder("Choose the screen to stream");
 
-                        let selecting_area_button = button("Select the area to stream")
-                        .padding(30)
-                        .width(400)
-                        .on_press(Message::ToggleSelectingArea);
+                        let selecting_area_button;
+                        match self.first_point {
+                            Some(_) => {
+                                selecting_area_button = button("Reset the area to FullScreen")
+                                .padding(30)
+                                .width(400)
+                                .on_press(Message::ToggleSelectingArea);
+                            },
+                            None => {
+                                selecting_area_button = button("Select the area to stream")
+                                .padding(30)
+                                .width(400)
+                                .on_press(Message::ToggleSelectingArea);
+                            },
+                        }
+                        
                         
                         let start_button;
                         let button_text = text("Start Streaming");

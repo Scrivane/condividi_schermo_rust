@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use gst::prelude::*;
+use gst::{prelude::*, Device};
 use gst::{Pipeline, State};
 use cfg_if::cfg_if;
 use iced::widget::shader::wgpu::naga::Range;
@@ -96,7 +96,7 @@ impl ScreenStreamer {
         #[cfg(target_os = "macos")]
         let videosrc = gst::ElementFactory::make("avfvideosrc")
             .property("capture-screen", true)
-            //.property("device-index", &extra )
+            .property("device-index", (monitor_index as i32 - 1))
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
