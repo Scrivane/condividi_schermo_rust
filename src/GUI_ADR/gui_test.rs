@@ -278,7 +278,7 @@ impl ScreenSharer {
             Message::SecondPoint => {
                 self.second_point = Some(self.mouse_point);
                 println!("New Points saved: {}, {}", self.first_point.unwrap(), self.second_point.unwrap());
-                self.is_selecting_area = false;
+                self.is_selecting_area = false;         
             },
             Message::ToggleSelectingArea => {
                 match self.first_point {
@@ -287,14 +287,11 @@ impl ScreenSharer {
                         self.second_point = None;
                     },
                     None => {
-                        return Task::batch(vec![
-                            window::change_mode(self.window_id, window::Mode::Fullscreen),   // Metti a schermo intero
-                            Task::perform(async { true }, |_| Message::SetSelectingArea),
-                        ]);
-                    },
-                }
-                
-            },
+                return Task::batch(vec![
+                    window::change_mode(self.window_id, window::Mode::Fullscreen),   // Metti a schermo intero
+                    Task::perform(async { true }, |_| Message::SetSelectingArea),
+                ]);
+            },}},
             Message::SetSelectingArea => {
                 self.first_point = None;
                 self.second_point = None;
@@ -680,6 +677,7 @@ fn style(&self, theme: &Theme) -> application::Appearance {
                 background_color: Color::TRANSPARENT,
                 text_color: theme.palette().text,
             }
+            
         }
         else {
             Theme::default_style(theme)
