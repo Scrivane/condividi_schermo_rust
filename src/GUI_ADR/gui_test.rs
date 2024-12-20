@@ -87,14 +87,15 @@ impl Default for ScreenSharer {
 
         let screen = Screen::all().unwrap();
         let displays: Vec<Display> = screen
-        .iter()
-        .map(|screen| Display{
-            //aggiungere conteggio da 1 in su;
-            id: screen.display_info.id,
-            width: screen.display_info.width,
-            height: screen.display_info.height,
-            frequency: screen.display_info.frequency
-        }).collect();
+            .iter()
+            .enumerate() // Aggiunge un contatore da 0 a n
+            .map(|(index, screen)| Display {
+                id: index as u32, // Usa l'indice come id
+                width: screen.display_info.width,
+                height: screen.display_info.height,
+                frequency: screen.display_info.frequency,
+            })
+            .collect();
 
         Self{
             input_value_client: "".to_string(),

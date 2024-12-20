@@ -86,7 +86,7 @@ impl ScreenStreamer {
         #[cfg(target_os = "windows")]
         let videosrc = gst::ElementFactory::make("d3d11screencapturesrc")
             .property("show-cursor", true)
-            .property("monitor-index", &(extra as i32))
+            .property("monitor-index", monitor_index as i32)
             //.property("show-border", true)
             .build()
             .map_err(|_| ServerError {
@@ -96,7 +96,7 @@ impl ScreenStreamer {
         #[cfg(target_os = "macos")]
         let videosrc = gst::ElementFactory::make("avfvideosrc")
             .property("capture-screen", true)
-            .property("device-index", (monitor_index as i32 - 1))
+            .property("device-index", monitor_index as i32)
             .build()
             .map_err(|_| ServerError { message: "Failed to create avfvideosrc".to_string()})?;
 
