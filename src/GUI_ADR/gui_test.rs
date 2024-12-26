@@ -64,6 +64,11 @@ enum StreamingState{
     Play,
     Pause,
 }
+enum ConnectionResult {
+    None, 
+    Success,
+    Failed,
+}
 
 struct ScreenSharer {
     input_value_client: String,
@@ -76,12 +81,12 @@ struct ScreenSharer {
     second_point: Option<Point>,
     is_selecting_area: bool,
     is_blank:bool,
-    window_id: window::Id,
     application_state: ApplicationState,
     available_display: Vec<Display>,
     selected_screen: Option<Display>,
     streaming_state: StreamingState,
-    connection_waiting: bool
+    connection_waiting: bool,
+    connection_result: ConnectionResult,
 }
 
 impl Default for ScreenSharer {
@@ -109,13 +114,13 @@ impl Default for ScreenSharer {
             first_point: None,
             second_point: None,
             is_selecting_area: false,
-            window_id: window::Id::unique(),
             application_state: ApplicationState::Start,
             available_display: displays,
             selected_screen: None,
             is_blank:false,
             streaming_state: StreamingState::Starting,
-            connection_waiting: false
+            connection_waiting: false,
+            connection_result: ConnectionResult::None,
         }
     }
 }
@@ -156,6 +161,7 @@ impl ScreenSharer {
             },
             Message::Connection => {
                     self.connection_waiting = true;
+                    
                     return Task::perform (async { },
                         |_| Message::ClientPressed,
                     );
@@ -168,7 +174,12 @@ impl ScreenSharer {
 
                     if let Ok(client) = client_handle.join() {
                         self.streamer_client = Some(client);
+                        self.connection_result = ConnectionResult::Success;
                     }
+                    else {
+                        self.connection_result = ConnectionResult::Failed;
+                    }
+                    
                     self.connection_waiting = false;
             }
             Message::StartRecording => {
@@ -581,12 +592,42 @@ impl ScreenSharer {
                         .push(text_input_client)
                         .push(client_icon);
         
-                        let content = column![]
-                        .spacing(15)
-                        .push(first_row)
-                        .push(second_row)
-                        .push(start_client_button);
+                        
+                        let content; 
+                        match self.connection_result {
+                            ConnectionResult::None => {
+                                content = column![]
+                                .spacing(15)
+                                .push(first_row)
+                                .push(second_row)
+                                .push(start_client_button);
+                            },
+                            ConnectionResult::Success => {
+                                let success_text = text("Currently connecting to a streaming")
+                                .size(26)
+                                .style(text::success);
 
+                                content = column![]
+                                .spacing(15)
+                                .push(first_row)
+                                .push(second_row)
+                                .push(start_client_button)
+                                .push(success_text);
+                                
+                            },
+                            ConnectionResult::Failed => {
+                                let failed_text = text("Error in connecting to a streaming, please retry")
+                                .size(26)
+                                .style(text::danger);
+
+                                content = column![]
+                                .spacing(15)
+                                .push(first_row)
+                                .push(second_row)
+                                .push(start_client_button)
+                                .push(failed_text);
+                            },
+                        }
                         return center(content).into();},
                 }
             },
