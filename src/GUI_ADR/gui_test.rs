@@ -87,6 +87,7 @@ struct ScreenSharer {
     streaming_state: StreamingState,
     connection_waiting: bool,
     connection_result: ConnectionResult,
+    is_recording: bool,
 }
 
 impl Default for ScreenSharer {
@@ -121,6 +122,7 @@ impl Default for ScreenSharer {
             streaming_state: StreamingState::Starting,
             connection_waiting: false,
             connection_result: ConnectionResult::None,
+            is_recording: false,
         }
     }
 }
@@ -186,8 +188,16 @@ impl ScreenSharer {
                 match self.streamer_client  {
                     None => println!("failed! No client was started before clicking on recording "),
                     Some(ref mut client) => {
-                        client.start_recording();
-                        //println!("{} / {} = {}", dividend, divisor, quotient)
+                        let result = client.start_recording();
+                        match result {
+                            Ok(_) => {
+                                println!("Start the recording");
+                                self.is_recording = true;
+                            },
+                            Err(e) => {
+                                println!("failed to start the recording session: {}", e);
+                            },
+                        }
                     },
                 }
         }
@@ -195,8 +205,17 @@ impl ScreenSharer {
             match self.streamer_client  {
                 None => println!("failed! No client was started before clicking on stop recording "),
                 Some(ref mut client) => {
-                    client.stop_recording();
-              
+                    let result = client.stop_recording();
+                    
+                    match result {
+                        Ok(_) => {
+                            println!("Stopping the recorder");
+                            self.is_recording = false;
+                        },
+                        Err(e) => {
+                            println!("failed to stop the recording session: {}", e);
+                        },
+                    }
                 },
             }
     }
@@ -507,7 +526,6 @@ impl ScreenSharer {
                 return content.into();
             },
             ApplicationState::Client => {
-
                 match self.connection_waiting {
                     true => {
                         //in attesa del collegamento per vedere lo streaming
@@ -562,25 +580,6 @@ impl ScreenSharer {
                             },
                         }
         
-                        let mut client_section_started = Self::container("Client")
-                        .push(
-                            "Currently receiving screencast",
-                        ).push(button("End client")
-                        .on_press(Message::StopClientPressed));
-                            if self
-                        .streamer_client
-                        .as_ref()
-                        .map_or_else(|| false, |client| client.get_is_rec()) ==false
-                        {
-                            client_section_started=client_section_started.push(
-                            button("start recording").on_press(Message::StartRecording),
-                        );
-                        } else {
-                            client_section_started=client_section_started.push(
-                            button("stop recording").on_press(Message::StopRec),
-                        );
-                        }
-        
                         let first_row = row![]
                         .align_y(Alignment::Start)
                         .push(back_area)
@@ -603,16 +602,40 @@ impl ScreenSharer {
                                 .push(start_client_button);
                             },
                             ConnectionResult::Success => {
-                                let success_text = text("Currently connecting to a streaming")
+                                let primary_text = text("Client")
+                                .size(50);
+
+                                let success_text = text("Currently connected to a streaming at ip:")
                                 .size(26)
                                 .style(text::success);
 
+                                let ip_text = text(&self.input_value_client)
+                                .size(22);
+
+                                let recording_button;
+                                match self.is_recording {
+                                    true => {
+                                        recording_button = button("Stop recording")
+                                        .on_press(Message::StopRec)
+                                        .width(500)
+                                        .padding(30)
+                                        .style(button::danger);
+                                    },
+                                    false => {
+                                        recording_button = button("Start recording")
+                                        .on_press(Message::StartRecording)
+                                        .width(500)
+                                        .padding(30)
+                                        .style(button::success);
+                                    },
+                                };
+
                                 content = column![]
                                 .spacing(15)
-                                .push(first_row)
-                                .push(second_row)
-                                .push(start_client_button)
-                                .push(success_text);
+                                .push(primary_text)
+                                .push(success_text)
+                                .push(ip_text)
+                                .push(recording_button);
                                 
                             },
                             ConnectionResult::Failed => {
