@@ -19,10 +19,10 @@ pub fn dimension_to_crop(first_point: Option<Point>, second_point: Option<Point>
             let min_y = y1.min(y2);
             let max_y = y1.max(y2);
 
-            let top_crop = (min_y - Point::ORIGIN.y);
-            let bottom_crop = (selected_screen.unwrap().height as f32 - max_y);
-            let right_crop = (selected_screen.unwrap().width as f32 - max_x);
-            let left_crop = (min_x);
+            let top_crop = min_y - Point::ORIGIN.y;
+            let bottom_crop = selected_screen.unwrap().height as f32 - max_y;
+            let right_crop = selected_screen.unwrap().width as f32 - max_x;
+            let left_crop = min_x;
             //Bisogna fare in modo che i numeri passati al crop siano pari altrimenti l'encoder darà problemi
             DimensionToCrop{
                 top: make_even_and_convert(top_crop),

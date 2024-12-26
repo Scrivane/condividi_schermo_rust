@@ -288,6 +288,7 @@ impl ScreenStreamer {
     }
 
     pub fn update_clients(&self, client_list_str: String) {
+
         let client_list = client_list_str.split(',').map(|s| s.to_string()).collect();
         {
             let mut clients = self.clients.lock().unwrap();
@@ -395,6 +396,11 @@ impl ScreenStreamer {
         //let oldpipeline=self.pipeline.expect("no pipeline old")
        
         let clients = self.clients.lock().unwrap();
+
+        if(clients.len()==0){ //se non ci sono clienti non serve fare nulla
+            return Ok({});
+        }
+        
         let addresses: Vec<String> = clients.iter().map(|addr| addr.to_string()).collect();
         let addresses_str = addresses.join(",");
 
