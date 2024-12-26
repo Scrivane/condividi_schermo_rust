@@ -200,36 +200,44 @@ impl ScreenSharer {
                         }
                     },
                 }
-        }
-        Message::StopRec => {
+            }
+            Message::StopRec => {
             match self.streamer_client  {
                 None => println!("failed! No client was started before clicking on stop recording "),
                 Some(ref mut client) => {
                     let result = client.stop_recording();
                     
-                    match result {
-                        Ok(_) => {
-                            println!("Stopping the recorder");
-                            self.is_recording = false;
-                        },
-                        Err(e) => {
-                            println!("failed to stop the recording session: {}", e);
-                        },
-                    }
-                },
+                        match result {
+                            Ok(_) => {
+                                println!("Stopping the recorder");
+                                self.is_recording = false;
+                                },
+                            Err(e) => {
+                              println!("failed to stop the recording session: {}", e);
+                            },
+                        }
+                    },
+                }
             }
-    }
             Message::StopClientPressed => {
+                //fermo la registrazione se la sto facendo, poi chiudo il client
+                if self.is_recording {
+                    match self.streamer_client {
+                        Some(ref mut client) => {
+                            client.stop_recording();
+                        },
+                        None => {},
+                    }
+                }
+                
                 if let Some(player) = self.streamer_client.take() {
                     std::thread::spawn(move || {
                         crate::stop_client(player).unwrap(); // Handle error appropriately
                     });
                 }
-                if let Some(player) = self.streamer_client.take() {
-                    std::thread::spawn(move || {
-                        crate::stop_client(player).unwrap(); // Handle error appropriately
-                    });
-                }
+                self.connection_result = ConnectionResult::None;
+                self.is_recording = false;
+                
             }
             Message::StreamerPressed => {
                 let crop = dimension_to_crop(self.first_point, self.second_point, self.selected_screen);
@@ -251,7 +259,6 @@ impl ScreenSharer {
                     }
                 }
                 
-
                 match self.selected_screen {
                     Some(_) => {
                         #[cfg(target_os = "linux")]
@@ -630,12 +637,18 @@ impl ScreenSharer {
                                     },
                                 };
 
+                                let finish_button = button("Stop watching the stream")
+                                .on_press(Message::StopClientPressed)
+                                .width(500)
+                                .padding(30);
+
                                 content = column![]
                                 .spacing(15)
                                 .push(primary_text)
                                 .push(success_text)
                                 .push(ip_text)
-                                .push(recording_button);
+                                .push(recording_button)
+                                .push(finish_button);
                                 
                             },
                             ConnectionResult::Failed => {
