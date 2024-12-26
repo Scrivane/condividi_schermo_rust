@@ -1,3 +1,4 @@
+use gstreamer_rtsp_server::prelude::SeekableExt;
 use iced::{keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
@@ -79,7 +80,8 @@ struct ScreenSharer {
     application_state: ApplicationState,
     available_display: Vec<Display>,
     selected_screen: Option<Display>,
-    streaming_state: StreamingState
+    streaming_state: StreamingState,
+    connection_waiting: bool
 }
 
 impl Default for ScreenSharer {
@@ -113,6 +115,7 @@ impl Default for ScreenSharer {
             selected_screen: None,
             is_blank:false,
             streaming_state: StreamingState::Starting,
+            connection_waiting: false
         }
     }
 }
@@ -138,6 +141,7 @@ enum Message {
     UnSetBlankScreen,
     PauseStreaming,
     ResumeStreaming,
+    Connection,
     #[cfg(target_os = "linux")]
     RetIdPipewire,
 }
@@ -150,6 +154,12 @@ impl ScreenSharer {
             Message::ChangeSelectedScreen(display) => {
                 self.selected_screen = Some(display);
             },
+            Message::Connection => {
+                    self.connection_waiting = true;
+                    return Task::perform (async { },
+                        |_| Message::ClientPressed,
+                    );
+            },
             Message::ClientPressed => {
                     let ip:IpAddr=self.input_value_client.clone().trim().parse::<IpAddr>().unwrap();
                     let client_handle = std::thread::spawn(move || {
@@ -159,6 +169,7 @@ impl ScreenSharer {
                     if let Ok(client) = client_handle.join() {
                         self.streamer_client = Some(client);
                     }
+                    self.connection_waiting = false;
             }
             Message::StartRecording => {
                 match self.streamer_client  {
@@ -485,78 +496,99 @@ impl ScreenSharer {
                 return content.into();
             },
             ApplicationState::Client => {
-                let main_text = text("Client")
-                .size(50);
 
-                let back_icon = Icon::new(Handle::from_path("src/images/left.png"));
-                let back_area = MouseArea::new(back_icon)
-                .on_press(Message::ChangeApplicationState(ApplicationState::Start))
-                .interaction(mouse::Interaction::Pointer);
-
-                let text_input_client = text_input("es.. 198.154.1.12", 
-                &self.input_value_client)
-                .on_input(Message::InputChangedClient)
-                .padding(10)
-                .size(40)
-                .width(400); 
-
-                let start_client_button;
-                let client_icon;
-                match self.can_continue_client() {
+                match self.connection_waiting {
                     true => {
-                        start_client_button = button("Connect to a screen sharing session")
-                        .width(500)
-                        .padding(30)
-                        .style(button::success)
-                        .on_press(Message::ClientPressed);
-                        client_icon = Icon::new(Handle::from_path("src/images/checked.png"));
+                        //in attesa del collegamento per vedere lo streaming
+                        let main_text = text("Client")
+                        .size(50);
+                        
+                        let inner_text = text("waiting for connection to the streaming...")
+                        .size(30);
+
+                        let final_col = column![]
+                        .push(main_text)
+                        .push(inner_text)
+                        .spacing(20)
+                        .padding(10);
+
+                        return center(final_col).into();
                     },
                     false => {
-                        start_client_button = button("Connect to a screen sharing session")
-                        .width(500)
-                        .padding(30)
-                        .style(button::danger);
-                        client_icon = Icon::new(Handle::from_path("src/images/cross.png"));
-                    },
+                        //view del client 
+                        let main_text = text("Client")
+                        .size(50);
+        
+                        let back_icon = Icon::new(Handle::from_path("src/images/left.png"));
+                        let back_area = MouseArea::new(back_icon)
+                        .on_press(Message::ChangeApplicationState(ApplicationState::Start))
+                        .interaction(mouse::Interaction::Pointer);
+        
+                        let text_input_client = text_input("es.. 198.154.1.12", 
+                        &self.input_value_client)
+                        .on_input(Message::InputChangedClient)
+                        .padding(10)
+                        .size(40)
+                        .width(400); 
+        
+                        let start_client_button;
+                        let client_icon;
+                        match self.can_continue_client() {
+                            true => {
+                                start_client_button = button("Connect to a screen sharing session")
+                                .width(500)
+                                .padding(30)
+                                .style(button::success)
+                                .on_press(Message::Connection);
+                                client_icon = Icon::new(Handle::from_path("src/images/checked.png"));
+                            },
+                            false => {
+                                start_client_button = button("Connect to a screen sharing session")
+                                .width(500)
+                                .padding(30)
+                                .style(button::danger);
+                                client_icon = Icon::new(Handle::from_path("src/images/cross.png"));
+                            },
+                        }
+        
+                        let mut client_section_started = Self::container("Client")
+                        .push(
+                            "Currently receiving screencast",
+                        ).push(button("End client")
+                        .on_press(Message::StopClientPressed));
+                            if self
+                        .streamer_client
+                        .as_ref()
+                        .map_or_else(|| false, |client| client.get_is_rec()) ==false
+                        {
+                            client_section_started=client_section_started.push(
+                            button("start recording").on_press(Message::StartRecording),
+                        );
+                        } else {
+                            client_section_started=client_section_started.push(
+                            button("stop recording").on_press(Message::StopRec),
+                        );
+                        }
+        
+                        let first_row = row![]
+                        .align_y(Alignment::Start)
+                        .push(back_area)
+                        .push(main_text)
+                        .spacing(20);
+        
+                        let second_row = row![]
+                        .spacing(10)
+                        .push(text_input_client)
+                        .push(client_icon);
+        
+                        let content = column![]
+                        .spacing(15)
+                        .push(first_row)
+                        .push(second_row)
+                        .push(start_client_button);
+
+                        return center(content).into();},
                 }
-
-                let mut client_section_started = Self::container("Client")
-                .push(
-                    "Currently receiving screencast",
-                ).push(button("End client")
-                .on_press(Message::StopClientPressed));
-                    if self
-                .streamer_client
-                .as_ref()
-                .map_or_else(|| false, |client| client.get_is_rec()) ==false
-                {
-                    client_section_started=client_section_started.push(
-                    button("start recording").on_press(Message::StartRecording),
-                );
-                } else {
-                    client_section_started=client_section_started.push(
-                    button("stop recording").on_press(Message::StopRec),
-                );
-                }
-
-                let first_row = row![]
-                .align_y(Alignment::Start)
-                .push(back_area)
-                .push(main_text)
-                .spacing(20);
-
-                let second_row = row![]
-                .spacing(10)
-                .push(text_input_client)
-                .push(client_icon);
-
-                let content = column![]
-                .spacing(15)
-                .push(first_row)
-                .push(second_row)
-                .push(start_client_button);
-
-                return center(content).into();
             },
             ApplicationState::Streamer => {
             if !self.is_selecting_area {

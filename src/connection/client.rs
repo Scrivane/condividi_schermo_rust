@@ -60,7 +60,7 @@ impl DiscoveryClient {
 
         
 
-        let mut count = 13;
+        let mut count = 3;
         let mut cond = true;
 
     // Use a while loop to wait until we get a succesfull response or we exceed 26 seconds
