@@ -307,11 +307,17 @@ impl ScreenSharer {
                     Ok(())=> { println!("Streaming end stream image");
                     if let Some(state) = self.streamer_state.take() {
                         std::thread::spawn(move || {
-                            thread::sleep(Duration::from_millis(40000));
+                            thread::sleep(Duration::from_millis(4000));
+                            //drop(state);
                             crate::stop_streamer(state).expect("Failed to stop streamer");
+                            
+                            
+
+
                         });
+                        
                         println!("Streamer stopped.");
-                        self.streaming_state = StreamingState::Pause;
+                        self.streaming_state = StreamingState::Starting;
                     } else {
                         println!("No active streamer to stop.");
                     }

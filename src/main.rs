@@ -27,7 +27,7 @@ extern "C" {
     fn CFRunLoopRun();
 }
 
-
+#[derive(PartialEq)] 
 enum ControlMessage {
     Pause,
     Resume,
@@ -54,7 +54,8 @@ fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<Stre
     let mut discovery_server = DiscoveryServer::new(client_sender);
     let discovery_thread = thread::spawn(move || {
         println!("Starting discovery server...");
-        discovery_server.run_discovery_listener().expect("Failed to run discovery server");
+        discovery_server.run_discovery_listener(control_receiver).expect("Failed to run discovery server");
+        println!("finisce mai il server ????...");
     });    
 
     let streamer_arc_clone = Arc::clone(&streamer_arc);
