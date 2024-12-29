@@ -16,7 +16,7 @@ use iced::widget::{
 };
 use iced::{border, window, Alignment, Color, Length, Subscription};
 use iced::Task;
-
+use cfg_if::cfg_if;
 
 #[cfg(target_os = "linux")]
 use ashpd::{
@@ -134,7 +134,7 @@ enum Message {
     StopStreamerPressed,
     StopClientPressed,
     InputChangedClient(String),
-    GotValNode(Result<u32,u32>),
+    GotValNode(Result<Display,u32>),
     PointUpdated(Point),
     FirstPoint,
     SecondPoint,
@@ -261,10 +261,7 @@ impl ScreenSharer {
                 
                 match self.selected_screen {
                     Some(_) => {
-                        #[cfg(target_os = "linux")]
-                        let id_screen:usize=self.valnode as usize;
-                        #[cfg(not(target_os = "linux"))]
-                        let id_screen: usize = self.selected_screen.unwrap().id as usize;
+let id_screen: usize = self.selected_screen.unwrap().id as usize;
                                 // Start the streamer in a separate thread and store the result in self.streamer_state.
                         let streamer_state = std::thread::spawn(move || {
                             crate::start_streamer(crop, id_screen).unwrap()
@@ -293,7 +290,9 @@ impl ScreenSharer {
                 );
             }
             Message::GotValNode(r)=>{
-                self.valnode=r.expect("Error in deciding valnode");
+                let pipe_res=r.expect("Error in deciding valnode");
+                self.selected_screen = Some(pipe_res);
+                self.valnode=self.selected_screen.unwrap().id;
                 println!("valnode2   :{}",self.valnode);
                 return Task::perform (async { },
                     |_| Message::StreamerPressed,
@@ -679,7 +678,7 @@ impl ScreenSharer {
                 let main_text = text("Streamer")
                 .size(50);
         
-                let content;
+                let mut content;
                 //cambio il content in base al fatto che stiamo streammando o no
                 match self.streaming_state {
                     StreamingState::Starting => {
@@ -691,13 +690,16 @@ impl ScreenSharer {
                         let first_row = row![back_area, main_text]
                         .spacing(20)
                         .align_y(Alignment::Start);
+                    #[cfg(not(target_os = "linux"))]
+                    {
 
                         let screens_list = pick_list(self.available_display.clone(),
                         self.selected_screen,
                         Message::ChangeSelectedScreen)
                         .width(400)
                         .padding(30)
-                        .placeholder("Choose the screen to stream");
+                        .placeholder("Choose the screen to stream"); 
+                    }
 
                         let selecting_area_button;
                         match self.first_point {
@@ -719,22 +721,15 @@ impl ScreenSharer {
                         let start_button;
                         let button_text = text("Start Streaming");
 
-                        #[cfg(target_os = "linux")]
-                        match self.selected_screen {
-                            Some(_) => {
-                                start_button = button(button_text)
+                        cfg_if! {
+                            if #[cfg(target_os = "linux")] {
+                        start_button = button(button_text)
                                 .padding(30)
                                 .width(400)
                                 .style(button::success)
                                 .on_press(Message::RetIdPipewire);
-                            },
-                            None => {
-                                start_button = button(button_text)
-                                .padding(30)
-                                .width(400)
-                                .style(button::danger);
-                            },
-                        }
+                            }}
+                        
 
                         #[cfg(not(target_os = "linux"))]
                         match self.selected_screen {
@@ -754,9 +749,15 @@ impl ScreenSharer {
                         }
                        
                         content = column![]
-                        .push(first_row)
-                        .push(screens_list)
-                        .push(selecting_area_button)
+                        .push(first_row);
+                        #[cfg(not(target_os = "linux"))]
+                        {
+                            content = content.push(screens_list);
+                        }
+                        
+                        
+               
+                        content=content.push(selecting_area_button)
                         .push(start_button)
                         .spacing(20);
                     },
@@ -868,10 +869,11 @@ fn style(&self, theme: &Theme) -> application::Appearance {
 }
 
 #[cfg(target_os = "linux")]
-async fn pipewirerec() -> Result<u32,u32>{
+async fn pipewirerec() -> Result<Display,u32>{
     let proxy = Screencast::new().await.expect("couln not start screencast proxi");
     let mut valnode: u32 = 0;
-   
+    let mut dim: Option<(i32, i32)>=None;
+    let mut display: Result<Display,u32> =Err(0);
     let session = proxy.create_session().await.expect("couln not start screencast session");
     proxy
         .select_sources(
@@ -888,12 +890,33 @@ async fn pipewirerec() -> Result<u32,u32>{
         .start(&session, &WindowIdentifier::default())
         .await.expect("couln not start response")
         .response().expect("couln not end response");
-    response.streams().iter().for_each(|stream| {
+    
+        for stream in response.streams() {
         println!("node id: {}", stream.pipe_wire_node_id());
         println!("size: {:?}", stream.size());
         println!("position: {:?}", stream.position());
-        valnode = stream.pipe_wire_node_id();
-    });
-    println!("valnode: {:?}", valnode);
-    Ok(valnode)
+        //valnode = stream.pipe_wire_node_id();
+        //dim= stream.size();
+        let (width, height) = stream.size().unwrap_or((0, 0));
+
+    // Placeholder frequency as it's not provided by the screencast API
+    let frequency = 60.0; // Set a default or calculate if available
+
+    let display = Display {
+        id: stream.pipe_wire_node_id(),
+        width: width as u32,
+        height: height as u32,
+        frequency,
+    };
+
+    println!("Generated Display: {:?}", display);
+
+    // Return the first valid display
+    return Ok(display);
+}
+    Err(0)
+
+
+
+    
 }
