@@ -1,11 +1,12 @@
 use gstreamer_rtsp_server::prelude::SeekableExt;
-use iced::{keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
+use iced::{advanced::Text, keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
 use cropper::dimension_to_crop;
 use iced::widget::{self, button, center, container, pick_list, Canvas, MouseArea};
 use std::{thread, time::Duration};
+
 use iced::{
     touch::Event::FingerMoved,
     event::{self, Event, Status}, 
@@ -414,7 +415,8 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                     StreamingState::Pause => {
                         let  state =self.streamer_state.as_ref().unwrap();
                         let arc_streamer_state =state.streamer_arc.lock();
-                        let streamer=arc_streamer_state.expect("errore  getting  arc").restart();
+                        let streamer=arc_streamer_state.expect("errore  getting  arc").un_pause();
+                        //.restart();
                         if streamer{
                             //we have restarted the streamer
                             self.streaming_state = StreamingState::Play;
@@ -454,7 +456,15 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                                 (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
                                     if key ==  Key::Character("s".into()) && modifiers.control() =>
                                 {
+
+                                    cfg_if! {
+                                        if #[cfg(target_os = "linux")] {
+                                            Some(Message::RetIdPipewire) 
+                                        }
+                                        else{
                                         Some(Message::StreamerPressed) 
+                                    }}
+
                                 },
                                 _ => None,
                             })
@@ -745,6 +755,11 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                                 .style(button::danger);
                             },
                         }
+
+
+                      /*   let shortcut_info = text("Shortcut: Ctrl+s to start streaming").color(Color::from_rgb(0.5, 0.5, 0.5))
+                        .size(16); */
+                        //.style(text::Color(Color::from_rgb(0.5, 0.5, 0.5))); 
                        
                         content = column![]
                         .push(first_row);
@@ -752,11 +767,12 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         { 
                             content = content.push(screens_list);
                         }
-                        
-                        
-               
+
+                      
+
                         content=content.push(selecting_area_button)
                         .push(start_button)
+                        .push(shortcut_text("Shortcut: Ctrl+s to start streaming"))
                         .spacing(20);
                     },
                     StreamingState::Play => {
@@ -791,7 +807,8 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         .push(ip_text)
                         .push(blankbutton)
                         .push(pause_stream_button)
-                        .push(end_stream_button);
+                        .push(end_stream_button)
+                        .push(shortcut_text("Shortcut: Ctrl+p to pause streaming"));
                     },
                     StreamingState::Pause => {
                         let pause_text = text("The streaming is currently in pause")
@@ -804,7 +821,9 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         content = column![]
                         .push(main_text)
                         .push(pause_text)
-                        .push(end_stream_button);
+                        .push(end_stream_button)
+                        .push(shortcut_text("Shortcut: Ctrl+r to reasume streaming"));
+                        
                     },
                 }              
                 center(content).into()
@@ -841,6 +860,9 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
             }
            }
        }
+       
+
+
 }
 
 fn style(&self, theme: &Theme) -> application::Appearance {
@@ -861,11 +883,15 @@ fn style(&self, theme: &Theme) -> application::Appearance {
         self.input_value_client.clone().trim().parse::<IpAddr>().is_ok()
 
     }
+
     fn container(title: &str) -> Column<'_, Message> {
         column![text(title).size(50)].spacing(20)
     }
-}
 
+}
+fn shortcut_text<>(label: &str) ->  iced::widget::Text {
+    text(label).size(16).color(Color::from_rgb(0.5, 0.5, 0.5))
+}
 #[cfg(target_os = "linux")]
 async fn pipewirerec() -> Result<Display,u32>{
     let proxy = Screencast::new().await.expect("couln not start screencast proxi");

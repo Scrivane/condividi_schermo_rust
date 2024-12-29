@@ -380,6 +380,28 @@ impl ScreenStreamer {
     }
 
 
+    pub fn un_pause(&mut self) -> bool {
+        if let Some(ref pipeline) = self.pipeline {
+            if self.is_streaming {
+                let pause_result = pipeline.set_state(State::Playing);
+                match pause_result {
+                    Ok(_) => {
+                        println!("UN Pause the streaming correctly");
+                        self.is_paused = true;
+                        return true;
+                    },
+                    Err(e) => {
+                        println!("Error in UNpausing the screen: {}", e);
+                        return false;
+                    },
+                }
+            }
+        }
+        println!("pipeline does not exist, cannot pause");
+        return false;
+    }
+
+
 
 
 
