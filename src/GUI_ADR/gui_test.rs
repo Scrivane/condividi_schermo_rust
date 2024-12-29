@@ -690,16 +690,14 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         let first_row = row![back_area, main_text]
                         .spacing(20)
                         .align_y(Alignment::Start);
-                    #[cfg(not(target_os = "linux"))]
-                    {
 
-                        let screens_list = pick_list(self.available_display.clone(),
+
+                        let screens_list: widget::PickList<'_, Display, Vec<Display>, Display, Message> = pick_list(self.available_display.clone(),
                         self.selected_screen,
                         Message::ChangeSelectedScreen)
                         .width(400)
                         .padding(30)
                         .placeholder("Choose the screen to stream"); 
-                    }
 
                         let selecting_area_button;
                         match self.first_point {
@@ -751,7 +749,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         content = column![]
                         .push(first_row);
                         #[cfg(not(target_os = "linux"))]
-                        {
+                        { 
                             content = content.push(screens_list);
                         }
                         
