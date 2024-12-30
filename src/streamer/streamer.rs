@@ -164,7 +164,11 @@ impl ScreenStreamer {
                 message: "Failed to create queue2".to_string(),
             })?;
 
-        let x264enc = gst::ElementFactory::make("x264enc").build()
+        let x264enc = gst::ElementFactory::make("x264enc")
+            .property("bitrate", 5000  as u32) // Bitrate in kbps
+            .property_from_str("speed-preset", "ultrafast") // Faster encoding
+            .property_from_str("tune", "zerolatency") //For live streaming with low latency
+            .build()
             .map_err(|_| ServerError {
                 message: "Failed to create x264enc".to_string(),
             })?;
@@ -430,7 +434,7 @@ impl ScreenStreamer {
         multifilesrc location={} loop=true !
         pngdec !
         videorate !
-        video/x-raw,framerate=30/1 !
+        video/x-raw,framerate=60/1 !
         videoconvert !
         x264enc !
         rtph264pay !
