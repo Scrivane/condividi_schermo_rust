@@ -813,10 +813,10 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                     StreamingState::Pause => {
                         let pause_text = text("The streaming is currently in pause")
                         .size(30);
-                        let end_stream_button = button("End Stream")
+                        let end_stream_button = button("Reasume")
                         .width(400)
                         .padding(30)
-                        .on_press(Message::StopStreamerPressed);
+                        .on_press(Message::ResumeStreaming);
 
                         content = column![]
                         .push(main_text)
