@@ -524,12 +524,12 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
        
        match self.application_state {
             ApplicationState::Start => {
-                let initial_text = text("Hello, select if you want to stream or to watch someone else");
-                let streamer_button = button("Start a new Streaming Session")
+                let initial_text = text("Hello, choose to stream or to watch");
+                let streamer_button = button("Start Streaming Session")
                 .padding(40)
                 .width(400)
                 .on_press(Message::ChangeApplicationState(ApplicationState::Streamer));
-                let client_button = button("Start a new Client Session")
+                let client_button = button("Start Client Session")
                 .padding(40)
                 .width(400)
                 .on_press(Message::ChangeApplicationState(ApplicationState::Client));
@@ -554,7 +554,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         let main_text = text("Client")
                         .size(50);
                         
-                        let inner_text = text("waiting for connection to the streaming...")
+                        let inner_text = text("waiting to connect to the stream...")
                         .size(30);
 
                         let final_col = column![]
@@ -627,7 +627,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                                 let primary_text = text("Client")
                                 .size(50);
 
-                                let success_text = text("Currently connected to a streaming at ip:")
+                                let success_text = text("Currently connected to the streaming at IP:")
                                 .size(26)
                                 .style(text::success);
 
@@ -776,7 +776,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         .spacing(20);
                     },
                     StreamingState::Play => {
-                        let play_text = text( "Currently streaming, a client can watch this stream on one of the following adresses ( be sure to be able to connect to one of those ip )")
+                        let play_text = text( "Currently streaming, a client can watch this stream on one of the following addresses ( be sure to be able to connect to one of these IPs )")
                         .size(30);
                         let ip_text = text(&self.ips);
                         
@@ -813,7 +813,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                     StreamingState::Pause => {
                         let pause_text = text("The streaming is currently in pause")
                         .size(30);
-                        let end_stream_button = button("Reasume")
+                        let end_stream_button = button("Resume")
                         .width(400)
                         .padding(30)
                         .on_press(Message::ResumeStreaming);
@@ -822,7 +822,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         .push(main_text)
                         .push(pause_text)
                         .push(end_stream_button)
-                        .push(shortcut_text("Shortcut: Ctrl+r to reasume streaming"));
+                        .push(shortcut_text("Shortcut: Ctrl+r to resume streaming"));
                         
                     },
                 }              
@@ -831,7 +831,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
             else {
                 //scelta della parte di screen da streammare
                 let column = column![];        
-                let over_text = text("Choose the area to stream")
+                let over_text = text("Drag your mouse to select the area you want to stream")
                 .color(Color::from_rgb(3.0, 0.0, 0.0));  //mettere uno sfonte oltro al testo senno non è carino  
         
                 let my_canvas =
