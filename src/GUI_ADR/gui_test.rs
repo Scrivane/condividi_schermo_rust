@@ -1,5 +1,4 @@
-use gstreamer_rtsp_server::prelude::SeekableExt;
-use iced::{advanced::Text, keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
+use iced::{ keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
@@ -29,11 +28,9 @@ use ashpd::{
 };
 
 
-#[cfg(target_os = "linux")]
-use repng::meta::palette;
+
 use screenshots::Screen;
-#[cfg(target_os = "linux")]
-use zbus::fdo::Error;
+
 
 use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
@@ -757,10 +754,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         }
 
 
-                      /*   let shortcut_info = text("Shortcut: Ctrl+s to start streaming").color(Color::from_rgb(0.5, 0.5, 0.5))
-                        .size(16); */
-                        //.style(text::Color(Color::from_rgb(0.5, 0.5, 0.5))); 
-                       
+    
                         content = column![]
                         .push(first_row);
                         #[cfg(not(target_os = "linux"))]
@@ -884,9 +878,6 @@ fn style(&self, theme: &Theme) -> application::Appearance {
 
     }
 
-    fn container(title: &str) -> Column<'_, Message> {
-        column![text(title).size(50)].spacing(20)
-    }
 
 }
 fn shortcut_text<>(label: &str) ->  iced::widget::Text {
@@ -895,9 +886,7 @@ fn shortcut_text<>(label: &str) ->  iced::widget::Text {
 #[cfg(target_os = "linux")]
 async fn pipewirerec() -> Result<Display,u32>{
     let proxy = Screencast::new().await.expect("couln not start screencast proxi");
-    let mut valnode: u32 = 0;
-    let mut dim: Option<(i32, i32)>=None;
-    let mut display: Result<Display,u32> =Err(0);
+
     let session = proxy.create_session().await.expect("couln not start screencast session");
     proxy
         .select_sources(
@@ -916,11 +905,8 @@ async fn pipewirerec() -> Result<Display,u32>{
         .response().expect("couln not end response");
     
         for stream in response.streams() {
-        println!("node id: {}", stream.pipe_wire_node_id());
-        println!("size: {:?}", stream.size());
-        println!("position: {:?}", stream.position());
-        //valnode = stream.pipe_wire_node_id();
-        //dim= stream.size();
+
+
         let (width, height) = stream.size().unwrap_or((0, 0));
 
     // Placeholder frequency as it's not provided by the screencast API

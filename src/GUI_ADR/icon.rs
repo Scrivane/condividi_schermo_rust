@@ -4,7 +4,7 @@ use iced::{
         renderer::{self, Quad},
         widget::Tree,
         Layout, Widget,
-    }, color, widget::{button, image::Handle, Theme}, Border, Color, Element, Length, Rectangle, Shadow, Size
+    }, color, widget::{ image::Handle, Theme}, Border, Color, Element, Length, Rectangle, Shadow, Size
 };
 
 pub struct Icon {

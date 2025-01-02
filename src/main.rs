@@ -1,17 +1,15 @@
+#![warn(unused_extern_crates)]
 use std::error::Error;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use display_info::DisplayInfo;
 use streamer::streamer::DimensionToCrop;
 
 mod streamer;
 mod connection;
-#[cfg(feature = "icedf")]
+
 mod GUI_ADR;
-#[cfg(feature = "icedf")]
+
 use crate::GUI_ADR::gui_test::run_iced;
 
 
@@ -33,7 +31,7 @@ enum ControlMessage {
     Resume,
     Stop,
 }
-#[cfg(feature = "icedf")]
+
 struct StreamerState {
     control_sender: mpsc::Sender<ControlMessage>,
     client_thread: thread::JoinHandle<()>,
@@ -41,7 +39,7 @@ struct StreamerState {
     streamer_arc: Arc<Mutex<ScreenStreamer>>,
 }
 
-#[cfg(feature = "icedf")]
+
 fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<StreamerState, Box<dyn Error>> {
 
 
@@ -87,7 +85,7 @@ fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<Stre
     })
 }
 
-#[cfg(feature = "icedf")]
+
 fn stop_streamer(state: StreamerState) -> Result<(), Box<dyn Error>> {
     // Send a stop message to the control thread
     state.control_sender.send(ControlMessage::Stop)?;
@@ -101,94 +99,19 @@ fn stop_streamer(state: StreamerState) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(not(feature = "icedf"))]
-fn start_streamer() -> Result<(), Box<dyn Error>> { //mettere se si prova in modalità iced
 
-
-    let num_monitor=select_monitor();
-    
-    
-
-   
-    let (control_sender, control_receiver) = mpsc::channel();
-    let (client_sender, client_receiver) = mpsc::channel();
-
-    let streamer = ScreenStreamer::new(num_monitor)?;
-    let streamer_arc = Arc::new(Mutex::new(streamer));
-
-    let mut discovery_server = DiscoveryServer::new(client_sender);
-    let discovery_thread = thread::spawn(move || {
-        println!("Starting discovery server...");
-        discovery_server.run_discovery_listener().expect("Failed to run discovery server");
-    });
-
-    // Gestisce i comandi di controllo in un thread separato
-    let streamer_arc_clone = Arc::clone(&streamer_arc);
-    let control_thread = thread::spawn(move || {
-        while let Ok(message) = control_receiver.recv() {
-            let mut streamer = streamer_arc_clone.lock().unwrap();
-            match message {
-                ControlMessage::Pause => streamer.pause(),
-                ControlMessage::Resume => streamer.start().unwrap(),
-                ControlMessage::Stop => {
-                    streamer.stop();
-                    break;
-                }
-
-            }
-        }
-    });
-
-    // Gestisce l'aggiunta di nuovi client in un altro thread
-    let streamer_arc_clone = Arc::clone(&streamer_arc);
-    let client_thread = thread::spawn(move || {
-        while let Ok(client_list) = client_receiver.recv() {
-            let client_list_clone = client_list.clone();
-            let  streamer = streamer_arc_clone.lock().unwrap();
-            streamer.update_clients(client_list);
-            println!("Client list update: {}", client_list_clone);
-        }
-    });
-
-    // Avvia lo streamer e gestisce gli eventi della tastiera
-    {
-        let mut streamer = streamer_arc.lock().unwrap();
-        streamer.start()?;
-        println!(
-            "Streamer started\n\
-            Press CTRL+C to stop the server\n\
-            Press CTRL+P to pause the stream\n\
-            Press CTRL+R to resume the stream"
-        );
-    }
-
-    handle_event(control_sender)?;
-
-    // Aspetta la terminazione dei thread
-    control_thread.join().expect("Control thread panicked");
-    client_thread.join().expect("Client thread panicked");
-    discovery_thread.join().expect("Discovery thread panicked");
-
-    Ok(())
-}
-
-
-#[cfg(feature = "icedf")]
 fn start_client(ip_addr: IpAddr) -> Result<StreamerClient, Box<dyn Error>> {
     let discovery_client = DiscoveryClient::new()?;
 
     let (client_ip,client_port) = discovery_client.discover_server(ip_addr)?;
-    //let client_port_clone = client_port.clone();
-    
 
-   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
     let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
     player.start_streaming()?;
 
     Ok(player)
 }
 
-#[cfg(feature = "icedf")]
+
 fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
 
 
@@ -204,53 +127,12 @@ fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
 
 }
 
-#[cfg(not(feature = "icedf"))]
-fn start_client() -> Result<(), Box<dyn Error>> {
-    let discovery_client = DiscoveryClient::new()?;
-    let (client_ip,client_port) = discovery_client.discover_server()?;
-    //let client_port_clone = client_port.clone();
-    
 
-   // drop(discovery_client);  //fondamentale per disconnettere il socket e renderlo cosi possibile da usare per gstreamer
-    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
-
-    player.start_streaming()?;
-    println!("Client started at port {}. Press Enter to stop...", &client_port);
-    //player.start_recording()?;
-
-    let _ = std::io::stdin().read_line(&mut String::new());
-
-    //player.stop_recording()?;
-    player.stop_streaming();
-
-    Ok(())
-}
-
-#[cfg(feature = "icedf")]
 fn main()  {
     run_iced();
 }
 
-#[cfg(not(feature = "icedf"))]
-fn main() -> Result<(), Box<dyn Error>> {
-  
 
-    
-    
-    
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        return Err("Usage: <program> [streamer|client]".into());
-    }
-
-    match args[1].as_str() {
-        "streamer" => start_streamer(),
-        "client" => start_client(),
-        _ => Err("Invalid mode. Use 'streamer' or 'client'".into()),
-    }
-  
-
-}
 
 /// macOS ha bisogno di un run loop per aprire finestre e utilizzare OpenGL.
 #[cfg(target_os = "macos")]

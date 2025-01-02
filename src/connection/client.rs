@@ -1,7 +1,7 @@
-use std::io::{self, ErrorKind};
+use std::io::{self};
 use std::time::Duration;
 use socket2::{Socket, Domain, Type, Protocol, SockAddr};
-use std::net::{SocketAddr, Ipv4Addr, IpAddr, SocketAddrV4};
+use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::mem::MaybeUninit;
 
 pub struct DiscoveryClient{
@@ -37,10 +37,9 @@ impl DiscoveryClient {
         Ok(DiscoveryClient { socket, local_port })
     }
 
-    #[cfg(feature = "icedf")]
     pub fn discover_server(&self,server_adress_ip:IpAddr) -> Result<(String,i32), io::Error> {
 
-        let broadcast_ip =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
+
 
         let server_adress = SocketAddr::new(server_adress_ip, 9000);
 
@@ -121,11 +120,7 @@ impl DiscoveryClient {
     }
 
     pub fn notify_disconnection(&self) -> Result<(), io::Error> {
-        let server_addr =  Ipv4Addr::new(192, 168, 1, 255); // L'indirizzo del server
 
-
-        //let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
-        let broadcast_addr = SocketAddrV4::new(server_addr, 9000);
         #[cfg(target_os = "linux")]
         let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let server_addr = SockAddr::from(broadcast_addr);

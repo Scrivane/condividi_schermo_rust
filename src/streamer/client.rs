@@ -1,21 +1,13 @@
 use gst::prelude::*;
 use rfd::FileDialog;
 use gst::{ClockTime, Element, Pipeline, State};
-use std::{fmt, path, thread};
+use std::{fmt, thread};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 #[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
 
 
-/*
-fn is_port_available(ip: &str, port: i32) -> bool {
-
-    println!("sto controllando {ip}   e {port} ");
-   // UdpSocket::bind((ip, port as u16)).is_ok()
-   true
-}
-*/
 
 #[cfg(target_os = "macos")]
 fn initialize_macos_app() {
@@ -246,18 +238,6 @@ impl StreamerClient {
                     .to_string(), 
                 None => "output_video.flv".to_string(), // Default file name
             };
-
-      /*   if let Some(path) = file_path {
-            let path_str = path.to_str().ok_or(ClientError {
-                message: "Invalid file path".to_string(),
-            })?;
-            self.start_recording(path_str)
-        } else {
-            Err(ClientError {
-                message: "No file path selected".to_string(),
-            })
-        }
- */
 
 
         if let Some(ref pipeline) = self.pipeline {

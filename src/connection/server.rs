@@ -1,9 +1,8 @@
 use std::net::{UdpSocket};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use std::sync::mpsc::{self, Receiver, Sender,TryRecvError};
+use std::sync::{Arc, atomic::{AtomicBool}};
+use std::sync::mpsc::{self, Receiver,TryRecvError};
 use std::error::Error;
 use std::io::{self,ErrorKind};
-//use iced::futures::channel::mpsc::TryRecvError;
 
 use crate::ControlMessage;
 pub struct DiscoveryServer {

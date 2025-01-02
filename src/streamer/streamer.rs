@@ -1,23 +1,11 @@
 use std::sync::{Arc, Mutex};
-use gst::{prelude::*, Device};
+use gst::{prelude::*};
 use gst::{Pipeline, State};
 use cfg_if::cfg_if;
-use iced::widget::shader::wgpu::naga::Range;
 use crate::streamer::error::ServerError;
-use iced::futures;
-use iced::Subscription;
-use std::time::{Instant, Duration};
 
-#[cfg(target_os = "linux")]
-use ashpd::{
-    desktop::{
-        screencast::{CursorMode, Screencast, SourceType},
-        PersistMode,
-    },
-    WindowIdentifier,
-};
-#[cfg(target_os = "linux")]
-use tokio::runtime::Runtime;
+
+
 
 pub struct DimensionToCrop {
     pub top: i32,
@@ -418,8 +406,7 @@ impl ScreenStreamer {
         }
 
         let image_path="src/images/".to_string()+imagename.trim();
-        //   grande.png";
-        //let oldpipeline=self.pipeline.expect("no pipeline old")
+
        
         let clients = self.clients.lock().unwrap();
 
