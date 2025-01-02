@@ -5,7 +5,7 @@ use icon::Icon;
 use std::sync::{Arc, Mutex};
 use cropper::dimension_to_crop;
 use iced::widget::{self, button, center, container, pick_list, Canvas, MouseArea};
-use std::{thread, time::Duration};
+use std::{ time::Duration};
 use async_std::task::sleep;
 
 use iced::{
@@ -361,7 +361,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         return Task::batch(vec![
                             Task::perform(async { true }, |_| Message::ChangeApplicationState(ApplicationState::Start)),  
                             stop_task,
-                        ]);;
+                        ]);
                     } else {
                         println!("No active streamer to stop.");
                     }
@@ -801,7 +801,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                             start_button = button("waiting for you to select screen in the other window")
                             .padding(30)
                             .width(400)
-                            .style(button::text);
+                            .style(button::danger);
 
 
                         }
@@ -811,12 +811,23 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
 
                         #[cfg(not(target_os = "linux"))]
                         match self.selected_screen {
-                            Some(_) => {
+                            Some(_) => { 
+                                if self.can_start_stream==true{
                                 start_button = button(button_text)
                                 .padding(30)
                                 .width(400)
                                 .style(button::success)
                                 .on_press(Message::StreamerPressed);
+                                }
+                                else{
+                                    let button_text = text("Wait, closing previous stream");
+                                    start_button = button(button_text)
+                                        .padding(30)
+                                        .width(400)
+                                        .style(button::danger);
+                                    
+                                    
+                                }
                             },
                             None => {
                                 start_button = button(button_text)
