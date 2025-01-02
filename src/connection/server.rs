@@ -1,10 +1,9 @@
 use std::net::{UdpSocket};
-use std::sync::{Arc, Mutex, atomic::{AtomicBool}};
+use std::sync::{Arc, atomic::{AtomicBool}};
 use std::sync::mpsc::{self, Receiver,TryRecvError};
 use std::error::Error;
 use std::io::{self,ErrorKind};
 
-use crate::ScreenStreamer;
 use crate::ControlMessage;
 pub struct DiscoveryServer {
     sender: mpsc::Sender<String>,
@@ -17,6 +16,7 @@ pub struct DiscoveryServer {
     Resume,
     Stop,
 } */
+
 impl DiscoveryServer {
     pub fn new(sender: mpsc::Sender<String>) -> Self {
         Self {

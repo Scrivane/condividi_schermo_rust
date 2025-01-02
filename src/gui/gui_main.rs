@@ -234,7 +234,7 @@ impl ScreenSharer {
                 if self.is_recording {
                     match self.streamer_client {
                         Some(ref mut client) => {
-                            client.stop_recording();
+                            client.stop_recording().unwrap(); // Handle error appropriately
                         },
                         None => {},
                     }
