@@ -410,7 +410,7 @@ impl ScreenStreamer {
        
         let clients = self.clients.lock().unwrap();
 
-        if(clients.len()==0){ //se non ci sono clienti non serve fare nulla
+        if clients.len()==0 { //se non ci sono clienti non serve fare nulla
             return Ok({});
         }
         

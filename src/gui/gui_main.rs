@@ -12,7 +12,7 @@ use iced::{
     mouse::{self, Event::{ButtonPressed, ButtonReleased, CursorMoved}},
      Element, Point, Theme};
 use iced::widget::{
-     column, row, text, text_input, Column
+     column, row, text, text_input
 };
 use iced::{border, window, Alignment, Color, Length, Subscription};
 use iced::Task;

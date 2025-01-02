@@ -1,4 +1,3 @@
-#![warn(unused_extern_crates)]
 use std::error::Error;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex, mpsc};
