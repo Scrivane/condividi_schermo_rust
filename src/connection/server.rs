@@ -111,26 +111,12 @@ impl DiscoveryServer {
                         }
                     }
                  
-                // Use the socket here
-            
-           /*  Err(e) if e.kind() == ErrorKind::AddrInUse => {
-                println!("Address is already in use. Cannot bind.");
-                return Ok(());
-                // Handle the situation when the address is already bound
-            }
-            Err(e) => {
-                println!("Failed to bind to 0.0.0.0:9000: ");
-                return Err(Box::new(e)); // Propagate other errors
-            } */
+          
             
 
 
         }
  
-
-
-
-        //println!("Discovery server is listening in {}",socket.local_addr().unwrap());
 
 
     }

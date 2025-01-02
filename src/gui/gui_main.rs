@@ -972,8 +972,7 @@ async fn pipewirerec() -> Result<Display,u32>{
 
         let (width, height) = stream.size().unwrap_or((0, 0));
 
-    // Placeholder frequency as it's not provided by the screencast API
-    let frequency = 60.0; // Set a default or calculate if available
+    let frequency = 60.0; // default for freq 
 
     let display = Display {
         id: stream.pipe_wire_node_id(),

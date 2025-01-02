@@ -1,6 +1,6 @@
 use std::fmt;
 
-//migliorare gestione errori
+
 pub struct ServerError {
     pub(crate) message: String,
 }
