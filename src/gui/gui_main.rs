@@ -817,11 +817,14 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         }
 
                       
-
+                        
                         content=content.push(selecting_area_button)
-                        .push(start_button)
-                        .push(shortcut_text("Shortcut: Ctrl+s to start streaming"))
-                        .spacing(20);
+                        .push(start_button);
+                        if self.can_start_stream{
+                            content=content.push(shortcut_text("Shortcut: Ctrl+s to start streaming"))
+                            }
+                        content=content.spacing(20);
+                        
                     },
                     StreamingState::Play => {
                         let play_text = text( "Currently streaming, a client can watch this stream on one of the following addresses ( be sure to be able to connect to one of these IPs )")
