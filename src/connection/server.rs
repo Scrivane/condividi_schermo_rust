@@ -7,7 +7,6 @@ use std::io::{self,ErrorKind};
 use crate::ScreenStreamer;
 use crate::ControlMessage;
 pub struct DiscoveryServer {
-    streamer: Arc<Mutex<ScreenStreamer>>,
     sender: mpsc::Sender<String>,
     clients: String,
     stop_flag: Arc<AtomicBool>,
@@ -19,9 +18,8 @@ pub struct DiscoveryServer {
     Stop,
 } */
 impl DiscoveryServer {
-    pub fn new(sender: mpsc::Sender<String>, streamer: Arc<Mutex<ScreenStreamer>>) -> Self {
+    pub fn new(sender: mpsc::Sender<String>) -> Self {
         Self {
-            streamer,
             stop_flag: Arc::new(AtomicBool::new(false)),
             sender,
             clients: String::new(),
@@ -104,28 +102,43 @@ impl DiscoveryServer {
                             println!("Failed to send client list: {}", e);
                         }
                     }
-                    else if received_message.trim() == "DISCONNECT" {
-                        let clients_str: Vec<&str> = self.clients.split(',').filter(|&s| s != src.to_string()).collect();
-                        self.clients = clients_str.join(",");
+                    else if received_message.trim() == "DISCONNECT" { 
+                        
+                        //let ip = src.ip().to_string();
+                        let port = src.port().to_string();
 
-                        {
-                            let mut streamer = self.streamer.lock().unwrap();
-                            streamer.update_clients(self.clients.clone());
-                        }
+                        
+                        
+                        let clients_str: Vec<String> = self.clients.split(',')
+                                        .filter(|&s| {
+                                                
+                                                if let Some(port_str) = s.split(":").nth(1) {
+                                                    port_str != port // Manteniamo solo quelli con porta diversa
+                                                } else {
+                                                    true // Mantieni il client se la porta non è presente (caso imprevisto)
+                                                }
+                                                
+                                            })
+                        .map(|s| s.to_string()) 
+                        .collect();
+                        
+                        self.clients = if clients_str.is_empty() {
+                            String::new() // Impostiamo una stringa vuota se la lista è vuota
+                        } else {
+                            clients_str.join(",") // Altrimenti uniamo gli elementi con una virgola
+                        };
+                        
                     
                         // Invia l'indirizzo del client al main tramite il canale
                         if let Err(e) = self.sender.send(self.clients.clone()) {
                             println!("Failed to send client list: {}", e);
                         }
                     }
-                 
-          
+              
             
 
 
         }
- 
-
 
     }
 }

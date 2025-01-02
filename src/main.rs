@@ -48,7 +48,7 @@ fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<Stre
     let streamer = ScreenStreamer::new(dimension, num_monitor).expect("errore creazione scren streamer");
     let streamer_arc = Arc::new(Mutex::new(streamer));
 
-    let mut discovery_server = DiscoveryServer::new(client_sender, Arc::clone(&streamer_arc));
+    let mut discovery_server = DiscoveryServer::new(client_sender);
     let discovery_thread = thread::spawn(move || {
         println!("Starting discovery server...");
         discovery_server.run_discovery_listener(control_receiver).expect("Failed to run discovery server");
@@ -61,7 +61,12 @@ fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<Stre
             let client_list_clone = client_list.clone();
             let streamer = streamer_arc_clone.lock().unwrap();
             streamer.update_clients(client_list);
-            println!("Client list updated: {}", client_list_clone);
+
+            if client_list_clone.is_empty() {
+                println!("No clients connected");
+            } else {
+                println!("Client list updated: {}", client_list_clone);
+            }
         }
     });
 

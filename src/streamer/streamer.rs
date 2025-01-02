@@ -303,8 +303,7 @@ impl ScreenStreamer {
 
             multiudpsink
                 .set_property("clients", &addresses_str);
-
-
+            
         }
     }
 
@@ -378,7 +377,7 @@ impl ScreenStreamer {
                 let pause_result = pipeline.set_state(State::Playing);
                 match pause_result {
                     Ok(_) => {
-                        println!("UN Pause the streaming correctly");
+                        println!("UNPause the streaming correctly");
                         self.is_paused = true;
                         return true;
                     },

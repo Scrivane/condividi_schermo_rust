@@ -126,7 +126,7 @@ impl DiscoveryClient {
         self.socket.set_broadcast(true)?;
         println!("Sending DISCONNECT message to {:?}", server_addr.as_socket_ipv4().unwrap().ip());
 
-        let disconnect_message = format!("DISCONNECT:{}", self.local_port);
+        let disconnect_message = "DISCONNECT";
         self.socket.send_to(disconnect_message.as_bytes(), &server_addr)?;
         println!("Sent DISCONNECT message with local port: {}", self.local_port);
 
