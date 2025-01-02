@@ -44,8 +44,11 @@ use super::{cropper, display, icon, selector_draw};
 
 pub fn run_iced() -> iced::Result {
     iced::application("Ferris - Iced", ScreenSharer::update, ScreenSharer::view)
-        .style(ScreenSharer::style).subscription(ScreenSharer::subscription).transparent(true)
-        .theme(|_| Theme::TokyoNight)//.transparent(true)
+        .style(ScreenSharer::style).subscription(ScreenSharer::subscription).window(iced::window::Settings {
+            //decorations: false,  to make window borderless
+            ..Default::default()
+        }).transparent(true)
+        .theme(|_| Theme::TokyoNight)
         .run()
 }
 
@@ -346,7 +349,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                     },
                     None => {
                 return Task::batch(vec![
-                    window::get_latest().and_then(iced::window::toggle_maximize),   // Metti a schermo intero
+                    window::get_latest().and_then(iced::window::toggle_maximize),  
                     Task::perform(async { true }, |_| Message::SetSelectingArea),
                 ]);
             },}},
