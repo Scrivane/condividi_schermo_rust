@@ -8,9 +8,9 @@ use streamer::streamer::DimensionToCrop;
 mod streamer;
 mod connection;
 
-mod GUI_ADR;
+mod gui;
 
-use crate::GUI_ADR::gui_test::run_iced;
+use crate::gui::gui_main::run_iced;
 
 
 use streamer::streamer::ScreenStreamer;
