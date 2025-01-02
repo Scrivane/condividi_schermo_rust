@@ -1,11 +1,13 @@
 use std::net::{UdpSocket};
-use std::sync::{Arc, atomic::{AtomicBool}};
+use std::sync::{Arc, Mutex, atomic::{AtomicBool}};
 use std::sync::mpsc::{self, Receiver,TryRecvError};
 use std::error::Error;
 use std::io::{self,ErrorKind};
 
+use crate::ScreenStreamer;
 use crate::ControlMessage;
 pub struct DiscoveryServer {
+    streamer: Arc<Mutex<ScreenStreamer>>,
     sender: mpsc::Sender<String>,
     clients: String,
     stop_flag: Arc<AtomicBool>,
@@ -17,8 +19,9 @@ pub struct DiscoveryServer {
     Stop,
 } */
 impl DiscoveryServer {
-    pub fn new(sender: mpsc::Sender<String>) -> Self {
+    pub fn new(sender: mpsc::Sender<String>, streamer: Arc<Mutex<ScreenStreamer>>) -> Self {
         Self {
+            streamer,
             stop_flag: Arc::new(AtomicBool::new(false)),
             sender,
             clients: String::new(),
@@ -104,7 +107,12 @@ impl DiscoveryServer {
                     else if received_message.trim() == "DISCONNECT" {
                         let clients_str: Vec<&str> = self.clients.split(',').filter(|&s| s != src.to_string()).collect();
                         self.clients = clients_str.join(",");
-        
+
+                        {
+                            let mut streamer = self.streamer.lock().unwrap();
+                            streamer.update_clients(self.clients.clone());
+                        }
+                    
                         // Invia l'indirizzo del client al main tramite il canale
                         if let Err(e) = self.sender.send(self.clients.clone()) {
                             println!("Failed to send client list: {}", e);

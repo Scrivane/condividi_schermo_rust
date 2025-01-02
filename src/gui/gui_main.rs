@@ -2,6 +2,7 @@ use iced::{ keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
+use std::sync::{Arc, Mutex};
 use cropper::dimension_to_crop;
 use iced::widget::{self, button, center, container, pick_list, Canvas, MouseArea};
 use std::{thread, time::Duration};
@@ -36,6 +37,7 @@ use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
 
 use crate::streamer::client::StreamerClient;
+use crate::connection::client::DiscoveryClient;
 use crate::StreamerState;
 
 use iced::application;
@@ -76,6 +78,7 @@ struct ScreenSharer {
     ips: String,
     streamer_client: Option<StreamerClient>,
     streamer_state: Option<StreamerState>,
+    connection_client: Option<Arc<Mutex<DiscoveryClient>>>,
     valnode:u32,
     mouse_point: Point,
     first_point: Option<Point>,
@@ -111,6 +114,7 @@ impl Default for ScreenSharer {
             input_value_client: "".to_string(),
             ips: "".to_string(),
             streamer_client: None,
+            connection_client: None,
             streamer_state: None,
             valnode: 0,
             mouse_point: Point::ORIGIN,
@@ -179,8 +183,9 @@ impl ScreenSharer {
                         crate::start_client(ip).unwrap() // in futuro maneggia errori
                     });
 
-                    if let Ok(client) = client_handle.join() {
+                    if let Ok((client, discovery_client)) = client_handle.join() {
                         self.streamer_client = Some(client);
+                        self.connection_client = Some(discovery_client);
                         self.connection_result = ConnectionResult::Success;
                     }
                     else {
@@ -235,10 +240,14 @@ impl ScreenSharer {
                     }
                 }
                 
-                if let Some(player) = self.streamer_client.take() {
-                    std::thread::spawn(move || {
-                        crate::stop_client(player).unwrap(); // Handle error appropriately
-                    });
+                match (self.streamer_client.take(), self.connection_client.take()) {
+                    (Some(player), Some(discovery_client)) => {
+                        std::thread::spawn(move || {
+                            crate::stop_client(player, discovery_client).unwrap(); // Handle error appropriately
+                        });
+                    }
+                    _ => {}
+ 
                 }
                 self.connection_result = ConnectionResult::None;
                 self.is_recording = false;
