@@ -6,27 +6,22 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#message-io = { version = "0.18", default-features = false, features = ["websocket"] } da valutare come soluzione alternativa
-gst = { package = "gstreamer", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" }
-gst-base = { package = "gstreamer-base", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" }
-gst-video = { package = "gstreamer-video", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" }
-gstreamer-video = "0.23.0"
-gstreamer-rtp = "0.23.0"
-gstreamer-rtsp-server = "0.23.0"
-glib = "0.20.0"
-clap = { version = "4.0", features = ["derive"] }
-ctrlc = "3.2"
-thiserror = "1.0.63"
-tokio = { version = "1", features = ["full"] }
-crossterm = "0.28.1"
+gst = { package = "gstreamer", git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs" , tag= "0.23.0" }
 cfg-if = "1.0.0"
+socket2 = "0.5.7"
+iced = { version = "0.13.1", features = ["canvas", "image", "advanced", "tokio"] }
+get_if_addrs = "0.5.3"
+screenshots = "0.8.10"
+rfd = "0.15.1"
 
 
 [target.'cfg(target_os = "linux")'.dependencies]
-zbus = "4.4.0"
-docopt = "1.1.1"
-quest = "0.3.0"
-repng = "0.2.2"
-serde = "1.0.204"
-webm = "1.1.2"
 ashpd = "0.9.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2.7"
+
+
+
+
+
