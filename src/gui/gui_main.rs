@@ -89,6 +89,7 @@ struct ScreenSharer {
     connection_waiting: bool,
     connection_result: ConnectionResult,
     is_recording: bool,
+    can_start_stream: bool
 }
 
 impl Default for ScreenSharer {
@@ -124,6 +125,7 @@ impl Default for ScreenSharer {
             connection_waiting: false,
             connection_result: ConnectionResult::None,
             is_recording: false,
+            can_start_stream:true,
         }
     }
 }
@@ -150,8 +152,10 @@ enum Message {
     PauseStreaming,
     ResumeStreaming,
     Connection,
+
     #[cfg(target_os = "linux")]
     RetIdPipewire,
+    DoNothing
 }
 
 impl ScreenSharer {
@@ -281,17 +285,43 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         println!("Cannot start the stream until you choose the screen"); 
                     },
                 }
+                self.can_start_stream=true;
                
             }
             #[cfg(target_os = "linux")]
             Message::RetIdPipewire => {
+                self.can_start_stream=false;
+
                 return Task::perform(
                     pipewirerec(),
                     Message::GotValNode,
                 );
             }
+
+            Message::DoNothing => {
+                
+            }
             Message::GotValNode(r)=>{
-                let pipe_res=r.expect("Error in deciding valnode");
+                let pipe_res=match r {
+                    Ok(dis)=> dis,
+                    Err(e) if  e==2 =>  {
+                        self.can_start_stream=true;
+                        return Task::perform (async { },
+                            |_| Message::DoNothing,
+                        );
+                    },
+
+                    Err(_) =>{
+                        self.can_start_stream=true;
+                        return Task::perform (async { },
+                            |_| Message::DoNothing
+                            
+                            
+                            ,
+                        );
+                    }
+                    
+                };
                 self.selected_screen = Some(pipe_res);
                 self.valnode=self.selected_screen.unwrap().id;
                 println!("valnode2   :{}",self.valnode);
@@ -452,7 +482,9 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                             Subscription::none()
                         },
                         ApplicationState::Streamer => {
-                            event::listen_with(|event, status, _queue| match (event, status) {
+
+                            match self.can_start_stream{  
+                                true=> {event::listen_with(|event, status, _queue| match (event, status) {
                                 (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)
                                     if key ==  Key::Character("s".into()) && modifiers.control() =>
                                 {
@@ -467,7 +499,9 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
 
                                 },
                                 _ => None,
-                            })
+                            }) }
+                           false=> Subscription::none()
+                        }
                         },
                         ApplicationState::Client => {
                             Subscription::none()
@@ -697,7 +731,10 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         .on_press(Message::ChangeApplicationState(ApplicationState::Start))
                         .interaction(mouse::Interaction::Pointer);
 
-                        let first_row = row![back_area, main_text]
+                        let first_row = match self.can_start_stream {
+                            true=>row![back_area, main_text],
+                            false=>row![ main_text]
+                        }
                         .spacing(20)
                         .align_y(Alignment::Start);
 
@@ -712,7 +749,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                         let selecting_area_button;
                         match self.first_point {
                             Some(_) => {
-                                selecting_area_button = button("Reset the area to FullScreen")
+                                selecting_area_button = button("Reset the area to Full Screen")
                                 .padding(30)
                                 .width(400)
                                 .on_press(Message::ToggleSelectingArea);
@@ -731,12 +768,26 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
 
                         cfg_if! {
                             if #[cfg(target_os = "linux")] {
+                                if self.can_start_stream{
+
+                                
                         start_button = button(button_text)
                                 .padding(30)
                                 .width(400)
                                 .style(button::success)
                                 .on_press(Message::RetIdPipewire);
-                            }}
+                            }
+                        
+                        else{
+                            start_button = button("wainting for you to select screen in the other window")
+                            .padding(30)
+                            .width(400)
+                            .style(button::text);
+
+
+                        }
+                        }
+                    }
                         
 
                         #[cfg(not(target_os = "linux"))]
@@ -905,7 +956,13 @@ async fn pipewirerec() -> Result<Display,u32>{
     let response = proxy
         .start(&session, &WindowIdentifier::default())
         .await.expect("couln not start response")
-        .response().expect("couln not end response");
+        .response();
+    
+    let response = match response {
+        Ok(r)=> r,
+        Err(e)=> {println!("errore: {:?}",e) ; return Err(2);}
+        
+    };
     
         for stream in response.streams() {
 
