@@ -2,9 +2,11 @@ use iced::{ keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
+use std::sync::{Arc, Mutex};
 use cropper::dimension_to_crop;
 use iced::widget::{self, button, center, container, pick_list, Canvas, MouseArea};
-use std::{thread, time::Duration};
+use std::{ time::Duration};
+use async_std::task::sleep;
 
 use iced::{
     touch::Event::FingerMoved,
@@ -36,6 +38,7 @@ use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
 
 use crate::streamer::client::StreamerClient;
+use crate::connection::client::DiscoveryClient;
 use crate::StreamerState;
 
 use iced::application;
@@ -76,6 +79,7 @@ struct ScreenSharer {
     ips: String,
     streamer_client: Option<StreamerClient>,
     streamer_state: Option<StreamerState>,
+    connection_client: Option<Arc<Mutex<DiscoveryClient>>>,
     valnode:u32,
     mouse_point: Point,
     first_point: Option<Point>,
@@ -111,6 +115,7 @@ impl Default for ScreenSharer {
             input_value_client: "".to_string(),
             ips: "".to_string(),
             streamer_client: None,
+            connection_client: None,
             streamer_state: None,
             valnode: 0,
             mouse_point: Point::ORIGIN,
@@ -135,6 +140,7 @@ enum Message {
     StreamerPressed,
     ClientPressed,
     StopStreamerPressed,
+     StreamerStopped,
     StopClientPressed,
     InputChangedClient(String),
     GotValNode(Result<Display,u32>),
@@ -179,8 +185,9 @@ impl ScreenSharer {
                         crate::start_client(ip).unwrap() // in futuro maneggia errori
                     });
 
-                    if let Ok(client) = client_handle.join() {
+                    if let Ok((client, discovery_client)) = client_handle.join() {
                         self.streamer_client = Some(client);
+                        self.connection_client = Some(discovery_client);
                         self.connection_result = ConnectionResult::Success;
                     }
                     else {
@@ -229,16 +236,20 @@ impl ScreenSharer {
                 if self.is_recording {
                     match self.streamer_client {
                         Some(ref mut client) => {
-                            client.stop_recording();
+                            client.stop_recording().unwrap(); // Handle error appropriately
                         },
                         None => {},
                     }
                 }
                 
-                if let Some(player) = self.streamer_client.take() {
-                    std::thread::spawn(move || {
-                        crate::stop_client(player).unwrap(); // Handle error appropriately
-                    });
+                match (self.streamer_client.take(), self.connection_client.take()) {
+                    (Some(player), Some(discovery_client)) => {
+                        std::thread::spawn(move || {
+                            crate::stop_client(player, discovery_client).unwrap(); // Handle error appropriately
+                        });
+                    }
+                    _ => {}
+ 
                 }
                 self.connection_result = ConnectionResult::None;
                 self.is_recording = false;
@@ -336,18 +347,21 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                 match res_img_stream {
                     Ok(())=> { println!("Streaming end stream image");
                     if let Some(state) = self.streamer_state.take() {
-                        std::thread::spawn(move || {
-                            thread::sleep(Duration::from_millis(4000));
-                            //drop(state);
+                        let stop_task = Task::perform(async move {
+                            // Simulate a delay to wait for clients to receive
+                            sleep(Duration::from_secs(4)).await;
+                            // Attempt to stop the streamer
                             crate::stop_streamer(state).expect("Failed to stop streamer");
-                            
-                            
-
-
-                        });
-                        
-                        println!("Streamer stopped.");
+                            true // Signal completion
+                        }, |_| Message::StreamerStopped);
+                        self.can_start_stream = false;
                         self.streaming_state = StreamingState::Starting;
+                        
+                       
+                        return Task::batch(vec![
+                            Task::perform(async { true }, |_| Message::ChangeApplicationState(ApplicationState::Start)),  
+                            stop_task,
+                        ]);
                     } else {
                         println!("No active streamer to stop.");
                     }
@@ -357,6 +371,11 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                     
                 }
             },
+            Message::StreamerStopped => {
+                // Update state after the streamer has been stopped to make possible to start a new one 
+                self.can_start_stream = true;
+
+            }
             Message::InputChangedClient(input_value) => {
                 self.input_value_client = input_value;
             },
@@ -779,10 +798,10 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                             }
                         
                         else{
-                            start_button = button("wainting for you to select screen in the other window")
+                            start_button = button("waiting for you to select screen in the other window")
                             .padding(30)
                             .width(400)
-                            .style(button::text);
+                            .style(button::danger);
 
 
                         }
@@ -792,12 +811,23 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
 
                         #[cfg(not(target_os = "linux"))]
                         match self.selected_screen {
-                            Some(_) => {
+                            Some(_) => { 
+                                if self.can_start_stream==true{
                                 start_button = button(button_text)
                                 .padding(30)
                                 .width(400)
                                 .style(button::success)
                                 .on_press(Message::StreamerPressed);
+                                }
+                                else{
+                                    let button_text = text("Wait, closing previous stream");
+                                    start_button = button(button_text)
+                                        .padding(30)
+                                        .width(400)
+                                        .style(button::danger);
+                                    
+                                    
+                                }
                             },
                             None => {
                                 start_button = button(button_text)

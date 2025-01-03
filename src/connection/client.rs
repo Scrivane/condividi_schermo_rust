@@ -121,14 +121,12 @@ impl DiscoveryClient {
 
     pub fn notify_disconnection(&self) -> Result<(), io::Error> {
 
-        #[cfg(target_os = "linux")]
         let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let server_addr = SockAddr::from(broadcast_addr);
         self.socket.set_broadcast(true)?;
-
         println!("Sending DISCONNECT message to {:?}", server_addr.as_socket_ipv4().unwrap().ip());
 
-        let disconnect_message = format!("DISCONNECT:{}", self.local_port);
+        let disconnect_message = "DISCONNECT";
         self.socket.send_to(disconnect_message.as_bytes(), &server_addr)?;
         println!("Sent DISCONNECT message with local port: {}", self.local_port);
 
@@ -165,3 +163,5 @@ impl Drop for DiscoveryClient {
             // The socket is automatically closed when it goes out of scope, so no need for extra code.
         }
     }
+
+

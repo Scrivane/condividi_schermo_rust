@@ -61,7 +61,12 @@ fn start_streamer(dimension: DimensionToCrop, num_monitor: usize) -> Result<Stre
             let client_list_clone = client_list.clone();
             let streamer = streamer_arc_clone.lock().unwrap();
             streamer.update_clients(client_list);
-            println!("Client list updated: {}", client_list_clone);
+
+            if client_list_clone.is_empty() {
+                println!("No clients connected");
+            } else {
+                println!("Client list updated: {}", client_list_clone);
+            }
         }
     });
 
@@ -99,19 +104,21 @@ fn stop_streamer(state: StreamerState) -> Result<(), Box<dyn Error>> {
 }
 
 
-fn start_client(ip_addr: IpAddr) -> Result<StreamerClient, Box<dyn Error>> {
-    let discovery_client = DiscoveryClient::new()?;
+fn start_client(ip_addr: IpAddr) -> Result<(StreamerClient, Arc<Mutex<DiscoveryClient>>), Box<dyn Error>> {
+    let discovery_client = Arc::new(Mutex::new(DiscoveryClient::new()?));
+    let (client_ip, client_port) = {
+        let client = discovery_client.lock().unwrap();
+        client.discover_server(ip_addr)?
+    };
 
-    let (client_ip,client_port) = discovery_client.discover_server(ip_addr)?;
-
-    let mut player = StreamerClient::new(client_ip.clone(),client_port)?;
+    let mut player = StreamerClient::new(client_ip.clone(), client_port)?;
     player.start_streaming()?;
 
-    Ok(player)
+    Ok((player, discovery_client))
 }
 
 
-fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
+fn stop_client(mut player:StreamerClient, discovery_client: Arc<Mutex<DiscoveryClient>> ) -> Result<(), Box<dyn Error>> {
 
 
     // andrebbe meso costrutto di sincronizzazione per evitare che cambi lo stato durante le successive istruzuini 
@@ -121,6 +128,8 @@ fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
     } 
     
     player.stop_streaming();
+    drop(discovery_client);
+
 
     Ok(())
 

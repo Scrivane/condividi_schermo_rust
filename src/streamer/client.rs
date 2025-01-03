@@ -169,15 +169,15 @@ impl StreamerClient {
                                     break;
                                 }
                                 gst::MessageView::Error(err) => {
-                                    eprintln!(
-                                        "Error received from element {:?}: {}",
-                                        err.src().map(|s| s.path_string()),
-                                        err.error()
-                                    );
-                                    eprintln!("Debugging information: {:?}", err.debug());
+                                    
                                     let mut streaming = is_streaming.lock().unwrap();
                                     *streaming = false;
-                                    break;
+
+                                    return Err(ClientError {
+                                        message: format!("Error from element {:?}: {}",
+                                                         err.src().map(|s| s.path_string()),
+                                                         err.error()),
+                                    });
                                 }
                                 _ => (),
                             }
@@ -195,7 +195,8 @@ impl StreamerClient {
                 if let Some(pipeline) = pipeline_clone {
                     pipeline.set_state(State::Null).unwrap();
                 }
-                println!("Closing render window. Press ENTER to close the client.");
+                println!("Closing render window...");
+                Ok(())
 
             });
 
@@ -241,7 +242,7 @@ impl StreamerClient {
 
 
         if let Some(ref pipeline) = self.pipeline {
-            if let Some(ref tee) = self.tee {
+            if let Some(ref _tee) = self.tee {
 
                 // Create new elements for recording
                 let queue_record = gst::ElementFactory::make("queue").build().map_err(|_| ClientError {

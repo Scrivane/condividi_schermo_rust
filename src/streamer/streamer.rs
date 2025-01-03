@@ -264,6 +264,8 @@ impl ScreenStreamer {
         self.update_multiudpsink();
     }
 
+    /* FUNZIONI ADD AND REMOVE CLIENT (NON SERVONO PIU)
+
     pub fn remove_client(&self, client_addr: String) -> Result<(), ServerError> {
         {
             let mut clients = self.clients.lock().map_err(|e| ServerError {
@@ -278,16 +280,25 @@ impl ScreenStreamer {
         println!("Removed client: {}", client_addr);
         Ok(())
     }
+    */
 
     pub fn update_clients(&self, client_list_str: String) {
 
         let client_list = client_list_str.split(',').map(|s| s.to_string()).collect();
         {
             let mut clients = self.clients.lock().unwrap();
-            *clients = client_list;
+            if client_list_str.is_empty(){
+                *clients = Vec::new();
+            }
+            else{
+                *clients = client_list;
+            }
+            
         }
         self.update_multiudpsink();
     }
+
+    
 
     fn update_multiudpsink(&self) {
         if let Some(pipeline) = &self.pipeline {
@@ -303,8 +314,7 @@ impl ScreenStreamer {
 
             multiudpsink
                 .set_property("clients", &addresses_str);
-
-
+            
         }
     }
 
@@ -378,7 +388,7 @@ impl ScreenStreamer {
                 let pause_result = pipeline.set_state(State::Playing);
                 match pause_result {
                     Ok(_) => {
-                        println!("UN Pause the streaming correctly");
+                        println!("UNPause the streaming correctly");
                         self.is_paused = true;
                         return true;
                     },
@@ -410,9 +420,10 @@ impl ScreenStreamer {
        
         let clients = self.clients.lock().unwrap();
 
-        if clients.len()==0 { //se non ci sono clienti non serve fare nulla
+        if clients.len() == 0 { //se non ci sono clienti non serve fare nulla
             return Ok({});
         }
+        
         
         let addresses: Vec<String> = clients.iter().map(|addr| addr.to_string()).collect();
         let addresses_str = addresses.join(",");
