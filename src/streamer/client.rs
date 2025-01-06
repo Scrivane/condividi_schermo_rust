@@ -4,6 +4,7 @@ use gst::{ClockTime, Element, Pipeline, State};
 use std::{fmt, thread};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use crate::streamer::error::ClientError;
 #[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
 
@@ -23,26 +24,7 @@ pub struct StreamerClient {
     pipeline: Option<Pipeline>,
     is_streaming: Arc<Mutex<bool>>,
     is_recording: Arc<Mutex<bool>>,
-    tee: Option<Element> //permette streaming e recording contemporaneo su 2 pipeline diverse
-}
-
-pub struct ClientError {
-    message: String,
-}
-
-impl fmt::Debug for ClientError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ClientError: {}", self.message)
-    }
-}
-
-impl fmt::Display for ClientError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ClientError: {}", self.message)
-    }
-}
-
-impl std::error::Error for ClientError {}
+    tee: Option<Element> //Allows streaming and recording to happen simultaneously in 2 different pipelines
 
 
 impl StreamerClient {
@@ -96,7 +78,7 @@ impl StreamerClient {
             .map_err(|_| ClientError { message: "Failed to create element 'videoconvert'".to_string() })?;
 
         let autovideosink = gst::ElementFactory::make("autovideosink")
-            .property("sync", true)  //se vuoi evitarlo di vederlo accelerato se sono inndietro togliere
+            .property("sync", true)  
             .build()
             .map_err(|_| ClientError { message: "Failed to create element 'autovideosink'".to_string() })?;
 
@@ -304,8 +286,8 @@ impl StreamerClient {
 
         Ok(())
     }
-    // Funzione per fermare la registrazione
-    pub fn stop_recording(&mut self) -> Result<(), ClientError> {   //adrebbe fattp in modo che si faccia anche unlink di cio che stavamo registrando
+
+    pub fn stop_recording(&mut self) -> Result<(), ClientError> {  
         let mut is_recording = self.is_recording.lock().unwrap();
         if !*is_recording {
             return Err(ClientError {

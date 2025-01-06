@@ -28,28 +28,30 @@ impl DiscoveryServer {
         socket.set_nonblocking(true)?;
                 loop {
                     match control_receiver.try_recv() {
+                       
                         Ok(ControlMessage::Stop) => {
                             println!("Received STOP signal. Stopping discovery listener...");
                             return Ok(());
-                        },
+                        }
+                        
+                        Ok(message) => {
+                            println!("Unhandled control message: {:?}", message);
+                        }
+                       
                         Err(TryRecvError::Empty) => {
-                           
-                        },
+                            // non fare nulla
+                        }
+                        
                         Err(e) => {
-                            println!("Control channel error: {}", e);
+                            log::error!("Control channel error: {}", e);
                             return Err(Box::new(io::Error::new(ErrorKind::Other, e.to_string())));
                         }
                     }
 
 
-                                                
-
-
-
                     let mut buf = [0; 1024];
                     let (amt, src) = match socket.recv_from(&mut buf) {
                         Ok(result) => result,
-                       // Err(ErrorKind::WouldBlock)=> continue,
                         Err(e) => {
                             if e.kind() == ErrorKind::WouldBlock {
                                 // If the socket would block (no data), we simply continue
@@ -65,7 +67,7 @@ impl DiscoveryServer {
                     println!("Received message: '{}' from {}", received_message, src);
         
                     if received_message.trim() == "DISCOVERY" {
-                        //risponde al client dandogli l'indirizzo ip che verrà assegnato nel multiudp
+                        //Risponde al client dandogli l'indirizzo ip che verrà assegnato nel multiudp
                         let response = format!("{}", src.ip().to_string());
         
                         if let Err(e) = socket.send_to(response.as_bytes(), &src) {
@@ -93,7 +95,6 @@ impl DiscoveryServer {
                     }
                     else if received_message.trim() == "DISCONNECT" { 
                         
-                        //let ip = src.ip().to_string();
                         let port = src.port().to_string();
 
                         
@@ -102,7 +103,7 @@ impl DiscoveryServer {
                                         .filter(|&s| {
                                                 
                                                 if let Some(port_str) = s.split(":").nth(1) {
-                                                    port_str != port // Manteniamo solo quelli con porta diversa
+                                                    port_str != port 
                                                 } else {
                                                     true // Mantieni il client se la porta non è presente (caso imprevisto)
                                                 }
@@ -114,7 +115,7 @@ impl DiscoveryServer {
                         self.clients = if clients_str.is_empty() {
                             String::new() // Impostiamo una stringa vuota se la lista è vuota
                         } else {
-                            clients_str.join(",") // Altrimenti uniamo gli elementi con una virgola
+                            clients_str.join(",") 
                         };
                         
                     

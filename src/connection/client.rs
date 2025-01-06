@@ -136,7 +136,7 @@ impl DiscoveryClient {
 }
 
 pub fn receive_with_timeout(socket: &Socket, buf: &mut [MaybeUninit<u8>]) -> Result<(usize, SockAddr), String> {
-    // Imposta il timeout di lettura
+    //Set the read timeout
     socket
         .set_read_timeout(Some(Duration::new(2, 0)))
         .expect("Failed to set read timeout");

@@ -118,8 +118,6 @@ fn start_client(ip_addr: IpAddr) -> Result<(StreamerClient, Arc<Mutex<DiscoveryC
 
 fn stop_client(mut player:StreamerClient, discovery_client: Arc<Mutex<DiscoveryClient>> ) -> Result<(), Box<dyn Error>> {
 
-
-    // andrebbe meso costrutto di sincronizzazione per evitare che cambi lo stato durante le successive istruzuini 
     match player.get_is_rec() {
         true => player.stop_recording()?,
         false => println!("It's not recording , we can end the stream "),
