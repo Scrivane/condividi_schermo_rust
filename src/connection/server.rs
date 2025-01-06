@@ -32,18 +32,14 @@ impl DiscoveryServer {
                         Ok(ControlMessage::Stop) => {
                             println!("Received STOP signal. Stopping discovery listener...");
                             return Ok(());
-                        }
-                        
-                        Ok(message) => {
-                            println!("Unhandled control message: {:?}", message);
-                        }
-                       
+                        }         
+     
                         Err(TryRecvError::Empty) => {
                             // non fare nulla
                         }
                         
                         Err(e) => {
-                            log::error!("Control channel error: {}", e);
+                            eprintln!("Control channel error: {}", e);
                             return Err(Box::new(io::Error::new(ErrorKind::Other, e.to_string())));
                         }
                     }

@@ -22,7 +22,7 @@ impl std::error::Error for ServerError {}
 
 
 pub struct ClientError {
-    message: String,
+    pub(crate) message: String,
 }
 
 impl fmt::Debug for ClientError {

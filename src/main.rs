@@ -24,7 +24,7 @@ extern "C" {
     fn CFRunLoopRun();
 }
 
-#[derive(PartialEq)] 
+#[derive(PartialEq, Eq, Debug)] 
 enum ControlMessage {
     Stop,
 }

@@ -1,7 +1,7 @@
 use gst::prelude::*;
 use rfd::FileDialog;
 use gst::{ClockTime, Element, Pipeline, State};
-use std::{fmt, thread};
+use std::{thread};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use crate::streamer::error::ClientError;
@@ -25,7 +25,7 @@ pub struct StreamerClient {
     is_streaming: Arc<Mutex<bool>>,
     is_recording: Arc<Mutex<bool>>,
     tee: Option<Element> //Allows streaming and recording to happen simultaneously in 2 different pipelines
-
+}
 
 impl StreamerClient {
     pub fn new(ip: String, port: i32) -> Result<Self, ClientError> {
