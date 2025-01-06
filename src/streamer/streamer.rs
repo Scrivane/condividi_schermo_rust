@@ -117,7 +117,7 @@ impl ScreenStreamer {
             if #[cfg(target_os = "linux")] {
 
 
-                let videoRate = gst::ElementFactory::make("videorate").property("max-rate", 30).property("drop-only", true)
+                let video_rate = gst::ElementFactory::make("videorate").property("max-rate", 30).property("drop-only", true)
                 .build()
                     .map_err(|_| ServerError {
                         message: "Failed to create videoRate".to_string(),
@@ -191,7 +191,7 @@ impl ScreenStreamer {
         cfg_if! {
             if #[cfg(target_os = "linux")] {
                 pipeline.add_many(&[
-                    &videoRate,
+                    &video_rate,
                 ]).map_err(|_| ServerError {
                     message: "Failed to add elements to pipeline for linux".to_string(),
                 })?;
@@ -217,7 +217,7 @@ impl ScreenStreamer {
             if #[cfg(target_os = "linux")] {
                 gst::Element::link_many(&[
                     &videosrc,
-                    &videoRate,
+                    &video_rate,
                     &capsfilter,
                 ]).map_err(|_| ServerError {
                     message: "Failed to link elements".to_string(),
