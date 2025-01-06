@@ -768,12 +768,10 @@ impl ScreenSharer {
                             }
                         
                         else{
-                            start_button = button("wainting for you to select screen in the other window")
+                            start_button = button("waiting for you to select screen in the other window")
                             .padding(30)
                             .width(400)
                             .style(button::text);
-
-
                         }
                         }
                     }
@@ -805,8 +803,6 @@ impl ScreenSharer {
                             content = content.push(screens_list);
                         }
 
-                      
-                        
                         content=content.push(selecting_area_button)
                         .push(start_button);
                         if self.can_start_stream{
@@ -871,8 +867,9 @@ impl ScreenSharer {
             else {
                 //scelta della parte di screen da streammare
                 let column = column![];        
-                let over_text = text("Drag your mouse to select the area you want to stream")
-                .color(Color::from_rgb(3.0, 0.0, 0.0));  //mettere uno sfonte oltro al testo senno non è carino  
+                let over_text = button("Drag your mouse to select the area you want to stream")
+                .style(button::success)
+                .padding(5);  //mettere uno sfonte oltro al testo senno non è carino  
         
                 let my_canvas =
                     Canvas::new(MyCanvas{first_point:self.first_point,
