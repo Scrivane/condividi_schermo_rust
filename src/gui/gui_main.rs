@@ -1,18 +1,17 @@
-use iced::{ keyboard::{Event::KeyPressed, Key}, widget::image::Handle};
 use selector_draw::MyCanvas;
 use display::Display;
 use icon::Icon;
 use cropper::dimension_to_crop;
-use iced::widget::{self, button, center, container, pick_list, Canvas, MouseArea};
 use std::{thread, time::Duration};
-
 use iced::{
+    application,
+    keyboard::{Event::KeyPressed, Key}, widget::image::Handle,
     touch::Event::FingerMoved,
     event::{self, Event, Status}, 
     mouse::{self, Event::{ButtonPressed, ButtonReleased, CursorMoved}},
      Element, Point, Theme};
 use iced::widget::{
-     column, row, text, text_input
+    self, button, center, container, pick_list, Canvas, MouseArea, column, row, text, text_input
 };
 use iced::{border, window, Alignment, Color, Length, Subscription};
 use iced::Task;
@@ -26,20 +25,11 @@ use ashpd::{
     },
     WindowIdentifier,
 };
-
-
-
 use screenshots::Screen;
-
-
 use std::net::IpAddr;
 use get_if_addrs::get_if_addrs;
-
 use crate::streamer::client::StreamerClient;
 use crate::StreamerState;
-
-use iced::application;
-
 use super::{cropper, display, icon, selector_draw};
 
 pub fn run_iced() -> iced::Result {
@@ -58,7 +48,6 @@ enum ApplicationState{
     Streamer,
     Client,
 }
-
 #[derive(Debug, Clone)]
 enum StreamingState{
     Starting,
@@ -137,7 +126,6 @@ enum Message {
     StopStreamerPressed,
     StopClientPressed,
     InputChangedClient(String),
-    GotValNode(Result<Display,u32>),
     PointUpdated(Point),
     FirstPoint,
     SecondPoint,
@@ -155,6 +143,8 @@ enum Message {
 
     #[cfg(target_os = "linux")]
     RetIdPipewire,
+    #[cfg(target_os = "linux")]
+    GotValNode(Result<Display,u32>),
     DoNothing
 }
 
@@ -182,6 +172,7 @@ impl ScreenSharer {
                     if let Ok(client) = client_handle.join() {
                         self.streamer_client = Some(client);
                         self.connection_result = ConnectionResult::Success;
+                        self.streaming_state = StreamingState::Play;
                     }
                     else {
                         self.connection_result = ConnectionResult::Failed;
@@ -266,7 +257,7 @@ impl ScreenSharer {
                 
                 match self.selected_screen {
                     Some(_) => {
-let id_screen: usize = self.selected_screen.unwrap().id as usize;
+                        let id_screen: usize = self.selected_screen.unwrap().id as usize;
                                 // Start the streamer in a separate thread and store the result in self.streamer_state.
                         let streamer_state = std::thread::spawn(move || {
                             crate::start_streamer(crop, id_screen).unwrap()
@@ -301,6 +292,7 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
             Message::DoNothing => {
                 
             }
+            #[cfg(target_os = "linux")]
             Message::GotValNode(r)=>{
                 let pipe_res=match r {
                     Ok(dis)=> dis,
@@ -340,10 +332,6 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                             thread::sleep(Duration::from_millis(4000));
                             //drop(state);
                             crate::stop_streamer(state).expect("Failed to stop streamer");
-                            
-                            
-
-
                         });
                         
                         println!("Streamer stopped.");
@@ -351,7 +339,6 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                     } else {
                         println!("No active streamer to stop.");
                     }
-                    
                 },
                     Err(e)=> println!("Server error while streaming static image: {}", e),
                     
@@ -369,7 +356,10 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
             Message::SecondPoint => {
                 self.second_point = Some(self.mouse_point);
                 println!("New Points saved: {}, {}", self.first_point.unwrap(), self.second_point.unwrap());
-                self.is_selecting_area = false;         
+                self.is_selecting_area = false;     
+                return Task::batch(vec![
+                    window::get_latest().and_then(iced::window::toggle_maximize),  
+                ]);    
             },
             Message::ToggleSelectingArea => {
                 match self.first_point {
@@ -482,7 +472,6 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                             Subscription::none()
                         },
                         ApplicationState::Streamer => {
-
                             match self.can_start_stream{  
                                 true=> {event::listen_with(|event, status, _queue| match (event, status) {
                                 (Event::Keyboard(KeyPressed { key, modifiers, .. }), Status::Ignored)

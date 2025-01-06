@@ -21,7 +21,8 @@ ashpd = "0.9.1"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2.7"
 
-
+[features]
+icedf = []
 
 
 

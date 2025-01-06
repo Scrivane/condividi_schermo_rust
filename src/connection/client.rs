@@ -121,7 +121,7 @@ impl DiscoveryClient {
 
     pub fn notify_disconnection(&self) -> Result<(), io::Error> {
 
-        #[cfg(target_os = "linux")]
+        
         let broadcast_addr = SocketAddr::new(Ipv4Addr::BROADCAST.into(), 9000);
         let server_addr = SockAddr::from(broadcast_addr);
         self.socket.set_broadcast(true)?;
