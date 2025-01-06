@@ -1,6 +1,5 @@
 use std::sync::{Arc, Mutex};
-use gst::{prelude::*};
-use gst::{Pipeline, State};
+use gst::{Pipeline, State, prelude::*};
 use cfg_if::cfg_if;
 use crate::streamer::error::ServerError;
 
@@ -248,37 +247,6 @@ impl ScreenStreamer {
         Ok(pipeline)
     }
     
-    
-
-
-
-    pub fn add_client(&mut self, client_addr: String) {
-        {
-            let mut clients = self.clients.lock().unwrap();
-            clients.push(client_addr.clone());
-        }
-
-        println!("Added client: {}", client_addr);
-
-        // Aggiorna il multiudpsink
-        self.update_multiudpsink();
-    }
-
-    pub fn remove_client(&self, client_addr: String) -> Result<(), ServerError> {
-        {
-            let mut clients = self.clients.lock().map_err(|e| ServerError {
-                message: format!("Failed to lock clients mutex: {}", e),
-            })?;
-            if let Some(index) = clients.iter().position(|addr| addr == &client_addr) {
-                clients.remove(index);
-            }
-        }
-
-        self.update_multiudpsink();
-        println!("Removed client: {}", client_addr);
-        Ok(())
-    }
-
     pub fn update_clients(&self, client_list_str: String) {
 
         let client_list = client_list_str.split(',').map(|s| s.to_string()).collect();
@@ -318,7 +286,7 @@ impl ScreenStreamer {
     }
     pub fn restart(&mut self) -> bool {
         if let Some(ref oldpipeline) = self.pipeline {
-            oldpipeline.set_state(gst::State::Null).map_err(|e| ServerError {
+            oldpipeline.set_state(gst::State::Null).map_err(|_e| ServerError {
                 message: format!("Failed to set old pipeline state to null"),
             }).expect("errore stopping old pipeline");
         
@@ -341,15 +309,6 @@ impl ScreenStreamer {
             },
         }
     }
-
-    pub fn stop(&mut self) {
-        if let Some(ref pipeline) = self.pipeline {
-            let _ = pipeline.set_state(State::Null).map(|_| ());
-        }
-        self.pipeline = None;
-        self.is_streaming = false;
-    }
-
     pub fn pause(&mut self) -> bool {
         if let Some(ref pipeline) = self.pipeline {
             if self.is_streaming {
@@ -392,14 +351,9 @@ impl ScreenStreamer {
         println!("pipeline does not exist, cannot pause");
         return false;
     }
-
-
-
-
-
     pub fn share_static_image_end(&mut self,imagename: String) -> Result<(), ServerError> {
         if let Some(ref oldpipeline) = self.pipeline {
-            oldpipeline.set_state(gst::State::Null).map_err(|e| ServerError {
+            oldpipeline.set_state(gst::State::Null).map_err(|_e| ServerError {
                 message: format!("Failed to set old pipeline state to null"),
             })?;
         
@@ -435,15 +389,19 @@ let pipeline = gst::parse::launch(pipeline_description.as_str()).expect("Failed 
 let new_pipeline = pipeline.dynamic_cast::<gst::Pipeline>().expect("Failed to cast pipeline to gst::Pipeline");
 
 
-    new_pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline of static image to Playing ".to_string());
+    let res = new_pipeline.set_state(State::Playing).map_err(|_| "Failed to set pipeline of static image to Playing ".to_string());
 
-        self.pipeline = Some(new_pipeline);
-        self.is_streaming = true;
-
-
-    
-            Ok({})
-        
+    match res {
+        Ok(_) => {
+            self.pipeline = Some(new_pipeline);
+            self.is_streaming = true;
+            println!("Image setted correctly");
+        },
+        Err(e) => {
+            println!("Error in setting the image: {}", e);
+        },
+    }
+        Ok({})
     }
         
  

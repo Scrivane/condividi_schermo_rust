@@ -26,8 +26,6 @@ extern "C" {
 
 #[derive(PartialEq)] 
 enum ControlMessage {
-    Pause,
-    Resume,
     Stop,
 }
 
@@ -128,7 +126,16 @@ fn stop_client(mut player:StreamerClient ) -> Result<(), Box<dyn Error>> {
 
 
 fn main()  {
-    run_iced();
+   let res = run_iced();
+
+   match res {
+    Ok(_) => {
+        println!("Application runned without error");
+    },
+    Err(e) => {
+        println!("Error Launching Application: {}", e);
+    },
+   }
 }
 
 

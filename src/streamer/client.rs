@@ -241,7 +241,7 @@ impl StreamerClient {
 
 
         if let Some(ref pipeline) = self.pipeline {
-            if let Some(ref tee) = self.tee {
+            if let Some(ref _tee) = self.tee {
 
                 // Create new elements for recording
                 let queue_record = gst::ElementFactory::make("queue").build().map_err(|_| ClientError {

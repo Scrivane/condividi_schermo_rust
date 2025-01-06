@@ -1,5 +1,4 @@
 use std::net::UdpSocket;
-use std::sync::{Arc, atomic::AtomicBool};
 use std::sync::mpsc::{self, Receiver,TryRecvError};
 use std::error::Error;
 use std::io::{self,ErrorKind};
@@ -31,10 +30,6 @@ impl DiscoveryServer {
                         Ok(ControlMessage::Stop) => {
                             println!("Received STOP signal. Stopping discovery listener...");
                             return Ok(());
-                        }
-                        Ok(_) => {
-                            println!("problemi ")
-
                         },
                         Err(TryRecvError::Empty) => {
                            

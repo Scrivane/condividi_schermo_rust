@@ -33,7 +33,7 @@ use crate::StreamerState;
 use super::{cropper, display, icon, selector_draw};
 
 pub fn run_iced() -> iced::Result {
-    iced::application("Ferris - Iced", ScreenSharer::update, ScreenSharer::view)
+    iced::application("Screen Sharer on Rust", ScreenSharer::update, ScreenSharer::view)
         .style(ScreenSharer::style).subscription(ScreenSharer::subscription).window(iced::window::Settings {
             //decorations: false,  to make window borderless
             ..Default::default()
@@ -65,7 +65,6 @@ struct ScreenSharer {
     ips: String,
     streamer_client: Option<StreamerClient>,
     streamer_state: Option<StreamerState>,
-    valnode:u32,
     mouse_point: Point,
     first_point: Option<Point>,
     second_point: Option<Point>,
@@ -78,7 +77,9 @@ struct ScreenSharer {
     connection_waiting: bool,
     connection_result: ConnectionResult,
     is_recording: bool,
-    can_start_stream: bool
+    can_start_stream: bool,
+    #[cfg(target_os = "linux")]
+    valnode:u32,
 }
 
 impl Default for ScreenSharer {
@@ -101,7 +102,6 @@ impl Default for ScreenSharer {
             ips: "".to_string(),
             streamer_client: None,
             streamer_state: None,
-            valnode: 0,
             mouse_point: Point::ORIGIN,
             first_point: None,
             second_point: None,
@@ -115,6 +115,10 @@ impl Default for ScreenSharer {
             connection_result: ConnectionResult::None,
             is_recording: false,
             can_start_stream:true,
+            #[cfg(target_os = "linux")]
+            valnode: 0,
+
+
         }
     }
 }
@@ -145,6 +149,7 @@ enum Message {
     RetIdPipewire,
     #[cfg(target_os = "linux")]
     GotValNode(Result<Display,u32>),
+    #[cfg(target_os = "linux")]
     DoNothing
 }
 
@@ -220,7 +225,16 @@ impl ScreenSharer {
                 if self.is_recording {
                     match self.streamer_client {
                         Some(ref mut client) => {
-                            client.stop_recording();
+                            let res = client.stop_recording();
+                            match res {
+                                Ok(_) => {
+                                    println!("Stopped the recorder");
+                                    self.is_recording = false;
+                                },
+                                Err(e) => {
+                                    println!("Error stopping the recorder: {}", e);
+                                },
+                            }
                         },
                         None => {},
                     }
@@ -288,7 +302,7 @@ impl ScreenSharer {
                     Message::GotValNode,
                 );
             }
-
+            #[cfg(target_os = "linux")]
             Message::DoNothing => {
                 
             }
