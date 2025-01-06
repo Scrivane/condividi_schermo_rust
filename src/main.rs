@@ -26,8 +26,6 @@ extern "C" {
 
 #[derive(PartialEq)] 
 enum ControlMessage {
-    Pause,
-    Resume,
     Stop,
 }
 
@@ -137,7 +135,16 @@ fn stop_client(mut player:StreamerClient, discovery_client: Arc<Mutex<DiscoveryC
 
 
 fn main()  {
-    run_iced();
+    let res = run_iced();
+
+    match res {
+        Ok(_) => {
+            println!("Application runned successfully");
+        },
+        Err(e) => {
+            println!("Error Running application: {}", e);
+        },
+    }
 }
 
 

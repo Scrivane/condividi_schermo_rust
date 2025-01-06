@@ -25,10 +25,10 @@ pub fn dimension_to_crop(first_point: Option<Point>, second_point: Option<Point>
             let left_crop = min_x;
             //Bisogna fare in modo che i numeri passati al crop siano pari altrimenti l'encoder darà problemi
             DimensionToCrop{
-                top: make_even_and_convert(top_crop),
-                bottom: make_even_and_convert(bottom_crop),
-                right: make_even_and_convert(right_crop),
-                left: make_even_and_convert(left_crop),
+                top: make_even_and_convert(top_crop).abs(),
+                bottom: make_even_and_convert(bottom_crop).abs(),
+                right: make_even_and_convert(right_crop).abs(),
+                left: make_even_and_convert(left_crop).abs(),
             }
         },
         None => {

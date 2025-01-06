@@ -5,7 +5,7 @@ use icon::Icon;
 use std::sync::{Arc, Mutex};
 use cropper::dimension_to_crop;
 use iced::widget::{self, button, center, container, pick_list, Canvas, MouseArea};
-use std::{ time::Duration};
+use std::time::Duration;
 use async_std::task::sleep;
 
 use iced::{
@@ -80,7 +80,6 @@ struct ScreenSharer {
     streamer_client: Option<StreamerClient>,
     streamer_state: Option<StreamerState>,
     connection_client: Option<Arc<Mutex<DiscoveryClient>>>,
-    valnode:u32,
     mouse_point: Point,
     first_point: Option<Point>,
     second_point: Option<Point>,
@@ -93,7 +92,9 @@ struct ScreenSharer {
     connection_waiting: bool,
     connection_result: ConnectionResult,
     is_recording: bool,
-    can_start_stream: bool
+    can_start_stream: bool,
+    #[cfg(target_os = "linux")]
+    valnode:u32,
 }
 
 impl Default for ScreenSharer {
@@ -117,7 +118,6 @@ impl Default for ScreenSharer {
             streamer_client: None,
             connection_client: None,
             streamer_state: None,
-            valnode: 0,
             mouse_point: Point::ORIGIN,
             first_point: None,
             second_point: None,
@@ -131,6 +131,8 @@ impl Default for ScreenSharer {
             connection_result: ConnectionResult::None,
             is_recording: false,
             can_start_stream:true,
+            #[cfg(target_os = "linux")]
+            valnode: 0,
         }
     }
 }
@@ -143,7 +145,6 @@ enum Message {
      StreamerStopped,
     StopClientPressed,
     InputChangedClient(String),
-    GotValNode(Result<Display,u32>),
     PointUpdated(Point),
     FirstPoint,
     SecondPoint,
@@ -158,9 +159,11 @@ enum Message {
     PauseStreaming,
     ResumeStreaming,
     Connection,
-
+    #[cfg(target_os = "linux")]
+    GotValNode(Result<Display,u32>),
     #[cfg(target_os = "linux")]
     RetIdPipewire,
+    #[cfg(target_os = "linux")]
     DoNothing
 }
 
@@ -241,7 +244,6 @@ impl ScreenSharer {
                         None => {},
                     }
                 }
-                
                 match (self.streamer_client.take(), self.connection_client.take()) {
                     (Some(player), Some(discovery_client)) => {
                         std::thread::spawn(move || {
@@ -277,7 +279,7 @@ impl ScreenSharer {
                 
                 match self.selected_screen {
                     Some(_) => {
-let id_screen: usize = self.selected_screen.unwrap().id as usize;
+                        let id_screen: usize = self.selected_screen.unwrap().id as usize;
                                 // Start the streamer in a separate thread and store the result in self.streamer_state.
                         let streamer_state = std::thread::spawn(move || {
                             crate::start_streamer(crop, id_screen).unwrap()
@@ -308,10 +310,11 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                     Message::GotValNode,
                 );
             }
-
+            #[cfg(target_os = "linux")]
             Message::DoNothing => {
                 
             }
+            #[cfg(target_os = "linux")]
             Message::GotValNode(r)=>{
                 let pipe_res=match r {
                     Ok(dis)=> dis,
@@ -388,7 +391,10 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
             Message::SecondPoint => {
                 self.second_point = Some(self.mouse_point);
                 println!("New Points saved: {}, {}", self.first_point.unwrap(), self.second_point.unwrap());
-                self.is_selecting_area = false;         
+                self.is_selecting_area = false; 
+                return Task::batch(vec![
+                    window::get_latest().and_then(iced::window::toggle_maximize),  
+                ]);        
             },
             Message::ToggleSelectingArea => {
                 match self.first_point {
@@ -802,13 +808,10 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                             .padding(30)
                             .width(400)
                             .style(button::danger);
-
-
                         }
                         }
                     }
                         
-
                         #[cfg(not(target_os = "linux"))]
                         match self.selected_screen {
                             Some(_) => { 
@@ -836,18 +839,13 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
                                 .style(button::danger);
                             },
                         }
-
-
-    
                         content = column![]
                         .push(first_row);
                         #[cfg(not(target_os = "linux"))]
                         { 
                             content = content.push(screens_list);
                         }
-
-                      
-                        
+  
                         content=content.push(selecting_area_button)
                         .push(start_button);
                         if self.can_start_stream{
@@ -912,8 +910,9 @@ let id_screen: usize = self.selected_screen.unwrap().id as usize;
             else {
                 //scelta della parte di screen da streammare
                 let column = column![];        
-                let over_text = text("Drag your mouse to select the area you want to stream")
-                .color(Color::from_rgb(3.0, 0.0, 0.0));  //mettere uno sfonte oltro al testo senno non è carino  
+                let over_text = button("Drag your mouse to select the area you want to stream")
+                .style(button::danger)
+                .padding(10);  //mettere uno sfonte oltro al testo senno non è carino  
         
                 let my_canvas =
                     Canvas::new(MyCanvas{first_point:self.first_point,

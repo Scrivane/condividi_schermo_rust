@@ -1,5 +1,4 @@
-use std::net::{UdpSocket};
-use std::sync::{Arc, atomic::{AtomicBool}};
+use std::net::UdpSocket;
 use std::sync::mpsc::{self, Receiver,TryRecvError};
 use std::error::Error;
 use std::io::{self,ErrorKind};
@@ -8,7 +7,6 @@ use crate::ControlMessage;
 pub struct DiscoveryServer {
     sender: mpsc::Sender<String>,
     clients: String,
-    stop_flag: Arc<AtomicBool>,
 }
 
 /* enum ControlMessage {
@@ -20,7 +18,6 @@ pub struct DiscoveryServer {
 impl DiscoveryServer {
     pub fn new(sender: mpsc::Sender<String>) -> Self {
         Self {
-            stop_flag: Arc::new(AtomicBool::new(false)),
             sender,
             clients: String::new(),
         }
@@ -29,19 +26,11 @@ impl DiscoveryServer {
     pub fn run_discovery_listener( &mut self,control_receiver:Receiver<ControlMessage>)  -> Result<(), Box<dyn Error>> {
         let socket = UdpSocket::bind("0.0.0.0:9000")?;
         socket.set_nonblocking(true)?;
-
-  
-
-
                 loop {
                     match control_receiver.try_recv() {
                         Ok(ControlMessage::Stop) => {
                             println!("Received STOP signal. Stopping discovery listener...");
                             return Ok(());
-                        }
-                        Ok(_) => {
-                            println!("problemi ")
-
                         },
                         Err(TryRecvError::Empty) => {
                            
