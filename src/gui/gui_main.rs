@@ -804,7 +804,7 @@ impl ScreenSharer {
                             }
                         
                         else{
-                            start_button = button("waiting for you to select screen in the other window or waiting to end previus stream");
+                            start_button = button("waiting for you to select screen in the other window or waiting to end previus stream")
                             .padding(30)
                             .width(400)
                             .style(button::danger);
